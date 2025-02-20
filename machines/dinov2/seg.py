@@ -593,12 +593,12 @@ def hyperprior_baseline_evaluation():
 # You can skip feature extraction if you have download the test dataset from https://drive.google.com/drive/folders/1RZFGlBd6wZr4emuGO4_YJWfKPtAwcMXQ
 if __name__ == "__main__":
     config_path = f"cfg/dinov2_vitg14_voc2012_linear_config.py"
-    backbone_checkpoint_path = '/home/gaocs/models/dinov2/dinov2_vitg14_pretrain.pth'
-    head_checkpoint_path = '/home/gaocs/models/dinov2/dinov2_vitg14_voc2012_linear_head.pth'
+    backbone_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_pretrain.pth'
+    head_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_voc2012_linear_head.pth'
     
-    source_img_path = '/home/gaocs/projects/FCM-LM/Data/dinov2/seg/source/VOC2012'
-    source_split_name = '/home/gaocs/projects/FCM-LM/Data/dinov2/seg/source/val_20.txt'
-    org_feature_path = '/home/gaocs/projects/FCM-LM/Data/dinov2/seg/feature_test'
-    rec_feature_path = '/home/gaocs/projects/FCM-LM/Data/dinov2/seg/feature_test'
+    source_img_path = '/gdata/gaocs/dataset/VOC2012'
+    source_split_name = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/source/seg_val_100.txt'
+    org_feature_path = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/feature_test_100'
+    rec_feature_path = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/feature_test_100'
 
     seg_pipeline(config_path, backbone_checkpoint_path, head_checkpoint_path, source_img_path, source_split_name, org_feature_path, rec_feature_path)

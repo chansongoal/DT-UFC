@@ -169,7 +169,7 @@ def cls_pipeline(backbone_checkpoint_path: str, head_checkpoint_path: str, sourc
     model.to(device)
 
     # Extract features
-    # extract_features(model, test_dataloader, org_feature_path)
+    extract_features(model, test_dataloader, org_feature_path)
 
     # Evaluate and print results
     acc, feat_mse = evaluate_cls(model, org_feature_path, rec_feature_path, source_label_name)

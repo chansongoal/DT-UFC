@@ -122,15 +122,15 @@ def hyperprior_train_evaluate_pipeline(data_root, model_type, task, max_v, min_v
     print('encoding time: ', time.time() - time_start)
 
 if __name__ == "__main__":
-    model_type = 'llama3'; task = 'csr'
-    max_v = 47.75; min_v = -78; trun_high = 5; trun_low = -5
-    lambda_value_all = [0.01405, 0.0142, 0.015, 0.07, 10]
-    epochs = 200; learning_rate = "1e-4"; batch_size = 40; patch_size = "64 4096" # height first, width later
+    # model_type = 'llama3'; task = 'csr'
+    # max_v = 47.75; min_v = -78; trun_high = 5; trun_low = -5
+    # lambda_value_all = [0.01405, 0.0142, 0.015, 0.07, 10]
+    # epochs = 200; learning_rate = "1e-4"; batch_size = 40; patch_size = "64 4096" # height first, width later
 
-    # model_type = 'dinov2'; task = 'cls'
-    # max_v = 104.1752; min_v = -552.451; trun_high = 5; trun_low = -5
-    # lambda_value_all = [0.001, 0.0017, 0.003, 0.0035, 0.01]
-    # epochs = 800; learning_rate = "1e-4"; batch_size = 128; patch_size = "256 256"   # height first, width later
+    model_type = 'dinov2'; task = 'cls'
+    max_v = 104.1752; min_v = -552.451; trun_high = 5; trun_low = -5
+    lambda_value_all = [0.001, 0.0017, 0.003, 0.0035, 0.01]
+    epochs = 800; learning_rate = "1e-4"; batch_size = 128; patch_size = "256 256"   # height first, width later
 
     # model_type = 'dinov2'; task = 'seg'
     # max_v = 103.2168; min_v = -530.9767; trun_high = 5; trun_low = -5
@@ -149,8 +149,8 @@ if __name__ == "__main__":
 
     trun_flag = True
     quant_type = 'uniform'; samples = 0; bit_depth = 1
-    data_root = "/home/gaocs/projects/FCM-LM/Data"
+    data_root = "/gdata1/gaocs/Data_FCM_NQ"
 
-    # lambda_value_all = [0.01, 0.02, 0.05, 0.2]
+    lambda_value_all = [0.01]
     for lambda_value in lambda_value_all:
         hyperprior_train_evaluate_pipeline(data_root, model_type, task, max_v, min_v, trun_flag, trun_low, trun_high, quant_type, samples, bit_depth, lambda_value, epochs, learning_rate, batch_size, patch_size)
