@@ -1,2 +1,2 @@
 #!/bin/bash 
-cd /ghome/gaocs/FCM-LM/machines/dinov2; python /ghome/gaocs/FCM-LM/machines/dinov2/seg.py
+cd /ghome/gaocs/FCM-NQ/machines/dinov2; python /ghome/gaocs/FCM-NQ/machines/dinov2/seg.py

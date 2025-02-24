@@ -492,13 +492,13 @@ def seg_pipeline(config_path: str, backbone_checkpoint_path: str, head_checkpoin
     os.makedirs(org_feature_path, exist_ok=True)
     extract_features(model, source_img_path, org_feature_path, image_list)
     
-    # Evaluate and print results
-    all_iou, all_miou, mse_list = seg_evaluate(model, source_img_path, org_feature_path, rec_feature_path, image_list, backbone_model)
+    # # Evaluate and print results
+    # all_iou, all_miou, mse_list = seg_evaluate(model, source_img_path, org_feature_path, rec_feature_path, image_list, backbone_model)
     
-    print(f"IoU: ", end=" ")
-    for iou in all_iou: print(f"{iou*100:.4f}", end=" ") 
-    print(f"\nmIoU: {all_miou*100:.4f}")
-    print(f"Feature MSE: {np.mean(mse_list):.8f}")
+    # print(f"IoU: ", end=" ")
+    # for iou in all_iou: print(f"{iou*100:.4f}", end=" ") 
+    # print(f"\nmIoU: {all_miou*100:.4f}")
+    # print(f"Feature MSE: {np.mean(mse_list):.8f}")
 
 def vtm_baseline_evaluation():
     # Set up paths
@@ -597,8 +597,8 @@ if __name__ == "__main__":
     head_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_voc2012_linear_head.pth'
     
     source_img_path = '/gdata/gaocs/dataset/VOC2012'
-    source_split_name = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/source/seg_val_100.txt'
-    org_feature_path = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/feature_test_100'
-    rec_feature_path = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/feature_test_100'
+    source_split_name = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/source/seg_voc_train.txt'
+    org_feature_path = '/gdata1/gaocs/FCM_LM_Train_Data/dinov2/seg/org_size'
+    rec_feature_path = '/gdata1/gaocs/FCM_LM_Train_Data/dinov2/seg/org_size'
 
     seg_pipeline(config_path, backbone_checkpoint_path, head_checkpoint_path, source_img_path, source_split_name, org_feature_path, rec_feature_path)

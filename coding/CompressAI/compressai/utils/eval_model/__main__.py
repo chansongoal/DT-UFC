@@ -221,7 +221,7 @@ def eval_model(
     is_vbr_model = args["architecture"].endswith("-vbr")
     #gcs
     model_type = args['model_type']; task = args["task"]; trun_flag = args["trun_flag"]; trun_low = args["trun_low"]
-    trun_high = args['trun_high']; quant_type = args['quant_type']; qsamples = args['qsamples']; bit_depth = args['bit_depth']
+    trun_high = args['trun_high']; quant_type = args['quant_type']; qsamples = args['qsamples']; bit_depth = args['bit_depth']; quant_points_name = args['quant_points_name']
 
     for filepath in filepaths:
         #gcs, load feature in the same way of training
@@ -231,7 +231,9 @@ def eval_model(
         #gcs, preprocessing
         if not args["half"]: feat = feat.astype(np.float32)
         if trun_flag == True: feat = FeatureFolder.truncation(feat, trun_low, trun_high)
-        feat = FeatureFolder.uniform_quantization(feat, trun_low, trun_high, bit_depth)
+        # feat = FeatureFolder.uniform_quantization(feat, trun_low, trun_high, bit_depth)
+        quantization_points = FeatureFolder.load_quantization_points(quant_points_name)
+        feat = FeatureFolder.nonlinear_quantization(feat, quantization_points, bit_depth)
         feat = FeatureFolder.packing(feat, model_type)
         x = torch.from_numpy(feat).to(device)
         x = x.unsqueeze(0); x = x.unsqueeze(0) # reshape to [1,1,H,W]
@@ -250,7 +252,8 @@ def eval_model(
             rec_feat = rec_feat.squeeze(0); rec_feat = rec_feat.squeeze(0)
             rec_feat = rec_feat.cpu().detach().numpy()
             rec_feat = FeatureFolder.unpacking(rec_feat, [N, C, H, W], model_type)
-            rec_feat = FeatureFolder.uniform_dequantization(rec_feat, trun_low, trun_high, bit_depth)
+            # rec_feat = FeatureFolder.uniform_dequantization(rec_feat, trun_low, trun_high, bit_depth)
+            rec_feat = FeatureFolder.nonlinear_dequantization(rec_feat, quantization_points, bit_depth)
             # Feature dtype
             dtype = np.float16 if model_type=='sd3' else np.float32
             rec_feat = rec_feat.astype(dtype)
@@ -406,6 +409,13 @@ def setup_args():
         type=int,
         default=1,
         help="Please input the bit_depth.",
+    )
+    parent_parser.add_argument(
+        "-quant_points_name",
+        "--quant_points_name",
+        type=str,
+        default="quant_points_name.json",
+        help="Please input the quant_points_name.",
     )
     parent_parser.add_argument(
         "-o",

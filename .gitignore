@@ -5,3 +5,6 @@ __pycache__/
 *.pyc
 *.pyo
 
+coding/CompressAI/compressai/.nfs*
+coding/CompressAI/core.
+err_out

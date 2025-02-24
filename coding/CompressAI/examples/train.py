@@ -40,6 +40,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 #gcs
+import os
 from compressai.datasets import FeatureFolder
 # from compressai.datasets import ImageFolder
 from compressai.losses import RateDistortionLoss
@@ -161,6 +162,8 @@ def save_checkpoint(state, is_best, filename="checkpoint.pth.tar"):
         best_checkpoint_name = f"{filename[:-8]}_best.pth.tar"
         # print(best_checkpoint_name)
         shutil.copyfile(filename, best_checkpoint_name)
+        #gcs, remove duplicated filename
+        os.remove(filename)
 
 
 def parse_args(argv):
@@ -172,7 +175,7 @@ def parse_args(argv):
         choices=image_models.keys(),
         help="Model architecture (default: %(default)s)",
     )
-    #gcs, model_type="sd3", task="tti", trun_flag=False, trun_low=-20, trun_high=20, quant_type="uniform", qsamples=0, bit_depth=1
+    #gcs, model_type="sd3", task="tti", trun_flag=False, trun_low=-20, trun_high=20, quant_type="uniform", qsamples=0, bit_depth=1, quant_points
     parser.add_argument(
         "-model_type",
         "--model_type",
@@ -228,6 +231,13 @@ def parse_args(argv):
         type=int,
         default=1,
         help="Please input the bit_depth.",
+    )
+    parser.add_argument(
+        "-quant_points_name",
+        "--quant_points_name",
+        type=str,
+        default="/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/quantization_mapping/quantization_mapping_seg_False_trunl-530.9767_trunh103.2168_kmeans_10_bitdepth8.json",
+        help="Please input the quant_points_name filename.",
     )
     parser.add_argument(
         "-mp",
@@ -288,6 +298,12 @@ def parse_args(argv):
         default=(512, 512), #(hgt, wdt)
         help="Size of the patches to be cropped (default: %(default)s)",
     )
+    parser.add_argument(
+        "--save_period",
+        type=int,
+        default=20,
+        help="Checkpoint save period (default: %(default)s)",
+    )
     parser.add_argument("--cuda", action="store_true", help="Use cuda")
     parser.add_argument(
         "--save", action="store_true", default=True, help="Save model to disk"
@@ -321,9 +337,9 @@ def main(argv):
     )
 
     #gcs 
-    train_dataset = FeatureFolder(args.dataset, split="train", transform=train_transforms, model_type=args.model_type, task=args.task, trun_flag=args.trun_flag, trun_low=args.trun_low, trun_high=args.trun_high, quant_type=args.quant_type, qsamples=args.qsamples, bit_depth=args.bit_depth, patch_size=args.patch_size)
-    test_dataset = FeatureFolder(args.dataset, split="test", transform=test_transforms, model_type=args.model_type, task=args.task, trun_flag=args.trun_flag, trun_low=args.trun_low, trun_high=args.trun_high, quant_type=args.quant_type, qsamples=args.qsamples, bit_depth=args.bit_depth, patch_size=args.patch_size)
-
+    train_dataset = FeatureFolder(args.dataset, split="train", transform=train_transforms, model_type=args.model_type, task=args.task, trun_flag=args.trun_flag, trun_low=args.trun_low, trun_high=args.trun_high, quant_type=args.quant_type, qsamples=args.qsamples, bit_depth=args.bit_depth, quant_points_name=args.quant_points_name, patch_size=args.patch_size)
+    test_dataset = FeatureFolder(args.dataset, split="test", transform=test_transforms, model_type=args.model_type, task=args.task, trun_flag=args.trun_flag, trun_low=args.trun_low, trun_high=args.trun_high, quant_type=args.quant_type, qsamples=args.qsamples, bit_depth=args.bit_depth, quant_points_name=args.quant_points_name, patch_size=args.patch_size)
+    print(f"model_type={args.model_type}, task={args.task}, trun_flag={args.trun_flag}, trun_low={args.trun_low}, trun_high={args.trun_high}, quant_type={args.quant_type}, qsamples={args.qsamples}, bit_depth={args.bit_depth}, quant_points_name={args.quant_points_name}, patch_size={args.patch_size}")
     device = "cuda" if args.cuda and torch.cuda.is_available() else "cpu"
 
     train_dataloader = DataLoader(
@@ -343,7 +359,6 @@ def main(argv):
     )
 
     net = image_models[args.model](quality=1)   # set default quality level to 1
-    # net = image_models[args.model](quality=3)
     net = net.to(device)
 
     if args.cuda and torch.cuda.device_count() > 1:
@@ -385,20 +400,37 @@ def main(argv):
         gc.collect()  # Run Python garbage collection
         torch.cuda.empty_cache()  # Then clear cached memory on GPU
         
+        #gcs, save checkpoint
         if args.save:
-            save_checkpoint(
-                {
-                    "epoch": epoch,
-                    "state_dict": net.state_dict(),
-                    "loss": loss,
-                    "optimizer": optimizer.state_dict(),
-                    "aux_optimizer": aux_optimizer.state_dict(),
-                    "lr_scheduler": lr_scheduler.state_dict(),
-                },
-                is_best,
-                #gcs
-                args.savepath,
-            )
+            if is_best:
+                save_checkpoint(
+                    {
+                        "epoch": epoch,
+                        "state_dict": net.state_dict(),
+                        "loss": loss,
+                        "optimizer": optimizer.state_dict(),
+                        "aux_optimizer": aux_optimizer.state_dict(),
+                        "lr_scheduler": lr_scheduler.state_dict(),
+                    },
+                    is_best,
+                    #gcs
+                    args.savepath,
+                )
+            elif (epoch % args.save_period == (args.save_period-1) or epoch == args.epochs - 1):
+                checkpoint_name = f"{args.savepath[:-8]}_epoch{epoch}.pth.tar"
+                save_checkpoint(
+                    {
+                        "epoch": epoch,
+                        "state_dict": net.state_dict(),
+                        "loss": loss,
+                        "optimizer": optimizer.state_dict(),
+                        "aux_optimizer": aux_optimizer.state_dict(),
+                        "lr_scheduler": lr_scheduler.state_dict(),
+                    },
+                    is_best,
+                    #gcs
+                    checkpoint_name,
+                )
 
 
 if __name__ == "__main__":

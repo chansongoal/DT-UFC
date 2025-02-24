@@ -35,6 +35,7 @@ from torch.utils.data import Dataset
 from compressai.registry import register_dataset
 
 import numpy as np 
+import json
 
 
 
@@ -60,7 +61,7 @@ class FeatureFolder(Dataset):
         split (string): split mode ('train' or 'val')
     """
 
-    def __init__(self, root, transform=None, split="train", model_type="sd3", task="tti", trun_flag=False, trun_low=-20, trun_high=20, quant_type="uniform", qsamples=0, bit_depth=1, patch_size=(512, 512)):
+    def __init__(self, root, transform=None, split="train", model_type="sd3", task="tti", trun_flag=False, trun_low=-20, trun_high=20, quant_type="uniform", qsamples=0, bit_depth=8, quant_points_name='quant_points.json', patch_size=(256, 256)):
         splitdir = Path(root) / split
 
         if not splitdir.is_dir():
@@ -68,7 +69,7 @@ class FeatureFolder(Dataset):
 
         self.samples = sorted(f for f in splitdir.iterdir() if f.is_file())
         #gcs
-        # self.samples = self.samples[:100]
+        self.samples = self.samples[:5000]
 
         self.transform = transform
 
@@ -81,6 +82,7 @@ class FeatureFolder(Dataset):
         self.quant_type = quant_type
         self.qsamples = qsamples
         self.bit_depth = bit_depth
+        self.quant_points_name = quant_points_name
         self.patch_size = patch_size    #(height, width), must be the multiple of 64
 
     def __getitem__(self, index):
@@ -93,11 +95,13 @@ class FeatureFolder(Dataset):
         """
         # Load feature, use float32 for training
         feat = np.load(self.samples[index]).astype(np.float32)
-        #gcs, preprocessing
-        if self.trun_flag == True: feat = FeatureFolder.truncation(feat, self.trun_low, self.trun_high)
-        feat = FeatureFolder.uniform_quantization(feat, self.trun_low, self.trun_high, self.bit_depth)
-        feat = FeatureFolder.packing(feat, self.model_type)
-        feat = FeatureFolder.random_crop(feat, self.patch_size)   # (height, width), must be the multiple of 64
+        # #gcs, preprocessing
+        # if self.trun_flag == True: feat = FeatureFolder.truncation(feat, self.trun_low, self.trun_high)
+        # # feat = FeatureFolder.uniform_quantization(feat, self.trun_low, self.trun_high, self.bit_depth)
+        # quantization_points = FeatureFolder.load_quantization_points(self.quant_points_name)
+        # feat = FeatureFolder.nonlinear_quantization(feat, quantization_points, self.bit_depth)
+        # feat = FeatureFolder.packing(feat, self.model_type)
+        # feat = FeatureFolder.random_crop(feat, self.patch_size)   # (height, width), must be the multiple of 64
         feat = np.expand_dims(feat, axis=0) # (C,H,W)
         # print(feat.shape)
         return feat
@@ -141,6 +145,115 @@ class FeatureFolder(Dataset):
             scale = ((2**bit_depth) -1) / (max_v - min_v)
             dequant_feat = feat / scale + min_v
         return dequant_feat
+
+    @staticmethod
+    def load_quantization_points(file_path: str or list[str]):
+        """
+        Load quantization points from a file or a list of files.
+        
+        Parameters:
+            file_path (Union[str, List[str]]): Path to load the quantization points from.
+                Can be a single file path (str) or a list of file paths (List[str]).
+        
+        Returns:
+            Union[numpy.ndarray, List[numpy.ndarray]]: Loaded quantization points. If `file_path`
+                is a single path, returns a single numpy.ndarray. If `file_path` is a list of paths,
+                returns a list of numpy.ndarray.
+        """
+        def load_file(path):
+            with open(path, 'r') as f:
+                quantization_points = np.array(json.load(f))
+            # print(f"Quantization points loaded from {path}")
+            return quantization_points
+
+        if isinstance(file_path, list):
+            # Load quantization points from each file in the list
+            return [load_file(path) for path in file_path]
+        elif isinstance(file_path, str):
+            # Load quantization points from a single file
+            return load_file(file_path)
+        else:
+            raise ValueError("file_path must be a string or a list of strings.")
+    
+    @staticmethod
+    def nonlinear_quantization(data, quantization_points, bit_depth):
+        """
+        Apply quantization to data using a single or multiple sets of quantization points.
+        
+        Parameters:
+            data (numpy.ndarray): Original floating-point array with shape (N, C, H, W).
+            quantization_points (Union[numpy.ndarray, List[numpy.ndarray]]): 
+                A single numpy array of quantization points or a list of numpy arrays,
+                one for each channel (C).
+        
+        Returns:
+            numpy.ndarray: Quantized integer array with the same shape as the input data.
+        """
+        if isinstance(quantization_points, np.ndarray):
+            # If quantization_points is a single array, apply it to all channels
+            num_levels = len(quantization_points)
+            data_flat = data.flatten()
+            quantized_data_flat = np.digitize(data_flat, quantization_points) - 1
+            quantized_data_flat = np.clip(quantized_data_flat, 0, num_levels - 1)
+            quantized_data = quantized_data_flat.reshape(data.shape)
+        elif isinstance(quantization_points, list):
+            if len(quantization_points) != data.shape[1]:
+                raise ValueError("Length of quantization_points list must match the number of channels (C) in data.")
+            
+            quantized_data = np.zeros_like(data, dtype=int)
+            # Apply different quantization points to each channel
+            for i, qp in enumerate(quantization_points):
+                num_levels = len(qp)
+                channel_data = data[:, i, :, :]
+                channel_data_flat = channel_data.flatten()
+                quantized_channel_flat = np.digitize(channel_data_flat, qp) - 1
+                quantized_channel_flat = np.clip(quantized_channel_flat, 0, num_levels - 1)
+                quantized_data[:, i, :, :] = quantized_channel_flat.reshape(channel_data.shape)
+        else:
+            raise ValueError("quantization_points must be a numpy array or a list of numpy arrays.")
+        
+        # quantized_data = quantized_data.astype(np.uint16) if bit_depth>8 else quantized_data.astype(np.uint8)
+        quantized_data = quantized_data.astype(np.float32) / (2**bit_depth) # normalize to [0,1)
+        return quantized_data
+
+    @staticmethod
+    def nonlinear_dequantization(quantized_data, quantization_points, bit_depth):
+        """
+        Dequantize quantized data back to its approximate original floating-point values.
+        
+        Parameters:
+            quantized_data (numpy.ndarray): Quantized integer array with shape (N, C, H, W).
+            quantization_points (Union[numpy.ndarray, List[numpy.ndarray]]): 
+                A single numpy array of quantization points or a list of numpy arrays,
+                one for each channel (C).
+        
+        Returns:
+            numpy.ndarray: Dequantized floating-point array with the same shape as the input data.
+        """
+        # scale quantized_data to [0,2**bit_depth-1]
+        quantized_data = np.clip(np.round(quantized_data * (2**bit_depth)), 0, 2**bit_depth-1)
+        quantized_data = quantized_data.astype(np.uint16) if bit_depth>8 else quantized_data.astype(np.uint8)
+
+        if isinstance(quantization_points, np.ndarray):
+            # If quantization_points is a single array, apply it to all channels
+            quantization_points = np.sort(quantization_points)  # Ensure points are sorted
+            dequantized_data = quantization_points[quantized_data]
+        elif isinstance(quantization_points, list):
+            if len(quantization_points) != quantized_data.shape[1]:
+                raise ValueError("Length of quantization_points list must match the number of channels (C) in quantized_data.")
+            
+            dequantized_data = np.zeros_like(quantized_data, dtype=np.float32)
+            # Apply different quantization points to each channel
+            for i, qp in enumerate(quantization_points):
+                qp = np.sort(qp)  # Ensure points are sorted
+                channel_data = quantized_data[:, i, :, :]
+                dequantized_data[:, i, :, :] = qp[channel_data]
+        else:
+            raise ValueError("quantization_points must be a numpy array or a list of numpy arrays.")
+        
+        # print(dequantized_data.dtype)
+        dequantized_data = dequantized_data.astype(np.float32)
+        return dequantized_data
 
     @staticmethod
     def packing(feat, model_type):
