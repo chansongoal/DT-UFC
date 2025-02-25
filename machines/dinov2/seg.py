@@ -544,13 +544,13 @@ def vtm_baseline_evaluation():
 def hyperprior_baseline_evaluation():
     # Set up paths
     config_path = 'cfg/dinov2_vitg14_voc2012_linear_config.py'
-    backbone_checkpoint_path = '/home/gaocs/models/dinov2/dinov2_vitg14_pretrain.pth'
-    head_checkpoint_path = '/home/gaocs/models/dinov2/dinov2_vitg14_voc2012_linear_head.pth'
+    backbone_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_pretrain.pth'
+    head_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_voc2012_linear_head.pth'
     
-    source_img_path = '/home/gaocs/projects/FCM-LM/Data/dinov2/seg/source/VOC2012'
-    source_split_name = '/home/gaocs/projects/FCM-LM/Data/dinov2/seg/source/val_20.txt'
-    org_feature_path = '/home/gaocs/projects/FCM-LM/Data/dinov2/seg/feature_test'
-    root_path = f'/home/gaocs/projects/FCM-LM/Data/dinov2/seg/hyperprior'; print('root_path: ', root_path)
+    source_img_path = '/gdata/gaocs/dataset/VOC2012'
+    source_split_name = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/source/val_20.txt'
+    org_feature_path = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/feature_test'
+    root_path = f'/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/hyperprior'; print('root_path: ', root_path)
     
     # Load configuration
     cfg = mmcv.Config.fromfile(config_path)
@@ -566,16 +566,18 @@ def hyperprior_baseline_evaluation():
     
     # Evaluate and print results
     max_v = 103.2168; min_v = -530.9767; trun_high = 5; trun_low = -5
-    lambda_value_all = [0.0005, 0.001, 0.003, 0.007, 0.015]
-    epochs = 800; learning_rate = "1e-4"; batch_size = 128; patch_size = "256 256"   # height first, width later
+    # lambda_value_all = [0.0005, 0.001, 0.003, 0.007, 0.015]
+    lambda_value_all = [0.003]
+    epochs = 400; learning_rate = "0.0001"; batch_size = 128; patch_size = "256 256"   # height first, width later
 
-    trun_flag = True
-    samples = 0; bit_depth = 1; quant_type = 'uniform'
+    trun_flag = False
+    samples = 10; bit_depth = 8; quant_type = 'kmeans'
 
     if trun_flag == False: trun_high = max_v; trun_low = min_v
 
     for lambda_value in lambda_value_all:
-        print(trun_low, trun_high, samples, bit_depth, quant_type, lambda_value)
+        print(trun_low, trun_high, quant_type, samples, bit_depth)
+        print(lambda_value, epochs, learning_rate, batch_size, patch_size)
         rec_feature_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/lambda{lambda_value}_epoch{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}"
 
         all_iou, all_miou, mse_list = seg_evaluate(model, source_img_path, org_feature_path, rec_feature_path, image_list, backbone_model)
@@ -584,21 +586,21 @@ def hyperprior_baseline_evaluation():
         print(f"\nmIoU: {all_miou*100:.4f}")
         print(f"Feature MSE: {np.mean(mse_list):.8f}")
 
-# # run below to evaluate the reconstructed features
-# if __name__ == "__main__":
-#     # vtm_baseline_evaluation()
-#     hyperprior_baseline_evaluation()
-
-# run below to extract original features as the dataset. 
-# You can skip feature extraction if you have download the test dataset from https://drive.google.com/drive/folders/1RZFGlBd6wZr4emuGO4_YJWfKPtAwcMXQ
+# run below to evaluate the reconstructed features
 if __name__ == "__main__":
-    config_path = f"cfg/dinov2_vitg14_voc2012_linear_config.py"
-    backbone_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_pretrain.pth'
-    head_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_voc2012_linear_head.pth'
-    
-    source_img_path = '/gdata/gaocs/dataset/VOC2012'
-    source_split_name = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/source/seg_voc_train.txt'
-    org_feature_path = '/gdata1/gaocs/FCM_LM_Train_Data/dinov2/seg/org_size'
-    rec_feature_path = '/gdata1/gaocs/FCM_LM_Train_Data/dinov2/seg/org_size'
+    # vtm_baseline_evaluation()
+    hyperprior_baseline_evaluation()
 
-    seg_pipeline(config_path, backbone_checkpoint_path, head_checkpoint_path, source_img_path, source_split_name, org_feature_path, rec_feature_path)
+# # run below to extract original features as the dataset. 
+# # You can skip feature extraction if you have download the test dataset from https://drive.google.com/drive/folders/1RZFGlBd6wZr4emuGO4_YJWfKPtAwcMXQ
+# if __name__ == "__main__":
+#     config_path = f"cfg/dinov2_vitg14_voc2012_linear_config.py"
+#     backbone_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_pretrain.pth'
+#     head_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_voc2012_linear_head.pth'
+    
+#     source_img_path = '/gdata/gaocs/dataset/VOC2012'
+#     source_split_name = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/source/seg_voc_train.txt'
+#     org_feature_path = '/gdata1/gaocs/FCM_LM_Train_Data/dinov2/seg/org_size'
+#     rec_feature_path = '/gdata1/gaocs/FCM_LM_Train_Data/dinov2/seg/org_size'
+
+#     seg_pipeline(config_path, backbone_checkpoint_path, head_checkpoint_path, source_img_path, source_split_name, org_feature_path, rec_feature_path)

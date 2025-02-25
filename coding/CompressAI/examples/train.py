@@ -403,6 +403,7 @@ def main(argv):
         #gcs, save checkpoint
         if args.save:
             if is_best:
+                print('Current best epoch: ', epoch)
                 save_checkpoint(
                     {
                         "epoch": epoch,
