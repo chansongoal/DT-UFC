@@ -1,6 +1,5 @@
 import os
 import re
-import matplotlib.pyplot as plt
 import time
 
 os.environ['MKL_THREADING_LAYER'] = 'GNU'
@@ -17,14 +16,17 @@ def generate_eval_commands(data_root, model_name, model_type, task, max_v, min_v
         f"python -m compressai.utils.eval_model checkpoint "
         f"{data_root}/{model_type}/{task}/feature_test "
         f"-a {arch} --cuda -v "
+        # lzj
         # modify the output path accordingly, use the epoch information
-        f"-d {data_root}/{model_type}/{task}/{model_name}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')} "
+        f"-d {data_root}/{model_type}/{task}/{model_name}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/"
+        f"lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}_epoch{epoch} "
         # load specified checkpoint accordingly, use the epoch information
         f"--per-image -p {data_root}/{model_type}/{task}/{model_name}/training_models/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/"
-        f"{arch}_lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}_checkpoint_best.pth.tar "  
+        f"{arch}_lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}_checkpoint_epoch{epoch}.pth.tar "  
         f"--model_type={model_type} --task={task} --trun_flag={trun_flag} --trun_low={trun_low} --trun_high={trun_high} --quant_type={quant_type} --qsamples={samples} --bit_depth={bit_depth} --quant_points_name={quant_points_name} "
-        f">{data_root}/{model_type}/{task}/{model_name}/encoding_log/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/"
-        f"compress_{model_name}_lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}.txt 2>&1"
+        # lzj
+        f">>{data_root}/{model_type}/{task}/{model_name}/encoding_log/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/"
+        f"compresslzj_{model_name}_lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}.txt 2>&1"
     )
 
     return eval_command
@@ -32,9 +34,10 @@ def generate_eval_commands(data_root, model_name, model_type, task, max_v, min_v
 def hyperprior_evaluate_pipeline(data_root, model_type, task, max_v, min_v, trun_flag, trun_low, trun_high, quant_type, samples, bit_depth, quant_points_name, lambda_value, epochs, save_period, learning_rate, batch_size, patch_size):
     arch = 'bmshj2018-hyperprior'
     model_name = arch.split('-')[-1]; print(model_name)
-
+    # lzj
     for epoch in range(save_period-1, epochs, save_period):
-        checkpoint_name = 
+        checkpoint_name = (f"{data_root}/{model_type}/{task}/{model_name}/training_models/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/"
+        f"{arch}_lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}_checkpoint_epoch{epoch}.pth.tar")
         # only perform evaluation when checkpoint exists
         if os.path.exists(checkpoint_name):
             eval_cmd = generate_eval_commands(data_root, model_name, model_type, task, max_v, min_v, trun_flag, trun_high, trun_low, quant_type, samples, bit_depth, quant_points_name, arch, lambda_value, epochs, epoch, save_period, learning_rate, batch_size, patch_size)
@@ -88,7 +91,7 @@ if __name__ == "__main__":
     trun_flag = False
 
     if trun_flag == False: trun_high = max_v; trun_low = min_v
-    quant_type = 'kmeans'; samples = 10#; bit_depth = 8
+    quant_type = 'kmeans'; samples = 10 #; bit_depth = 8
 
     args = argument_parsing()
     lambda_value = args.lambda_value

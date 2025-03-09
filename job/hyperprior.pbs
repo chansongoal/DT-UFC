@@ -1,7 +1,7 @@
 #PBS -N 3e-3_200_1e-4_8
 #PBS -o /ghome/gaocs/FCM-NQ/err_out/3e-3_200_1e-4_8.out
 #PBS -e /ghome/gaocs/FCM-NQ/err_out/3e-3_200_1e-4_8.err
-#PBS -l nodes=1:gpus=1:A,walltime=350:00:00
+#PBS -l nodes=1:gpus=1:s,walltime=350:00:00
 #PBS -r y
 cd $PBS_O_WORKDIR
 echo Time is `date`
@@ -12,6 +12,6 @@ cat $PBS_GPUFILE
 
 startdocker -u " -v /gdata/gaocs:/gdata/gaocs  -v /gdata1/gaocs:/gdata1/gaocs -v /gdata2/gaocs:/gdata2/gaocs --shm-size=16g " \
     -P /ghome/gaocs \
-    -s "/ghome/gaocs/FCM-NQ/job/hyperprior.sh 0.003 200 20 1e-4 128 256 8" \
+    -s "/ghome/gaocs/FCM-NQ/job/hyperprior.sh 0.015 800 40 1e-4 128 256 8" \
     bit:5000/gaocs_compressai_llama3_container:2.1.1-cuda12.1-cudnn8-runtime
 

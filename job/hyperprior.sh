@@ -2,7 +2,7 @@
 export HOME=/ghome/gaocs
 cd /ghome/gaocs/FCM-NQ/coding/CompressAI; pip install -e .
 
-python /ghome/gaocs/FCM-NQ/coding/CompressAI/run_batch.py \
+python /ghome/gaocs/FCM-NQ/coding/CompressAI/eval_batch.py \
     --lambda_value "$1" \
     --epochs "$2" \
     --save_period "$3" \

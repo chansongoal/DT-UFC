@@ -1,0 +1,17 @@
+#PBS -N cross_eval
+#PBS -o /ghome/gaocs/FCM-NQ/err_out/cross_eval.out
+#PBS -e /ghome/gaocs/FCM-NQ/err_out/cross_eval.err
+#PBS -l nodes=1:gpus=1:s,walltime=350:00:00
+#PBS -r y
+cd $PBS_O_WORKDIR
+echo Time is `date`
+echo Directory is $PWD
+echo This job runs on following nodes and gpus:
+cat $PBS_NODEFILE
+cat $PBS_GPUFILE
+
+startdocker -u " -v /gdata/gaocs:/gdata/gaocs  -v /gdata1/gaocs:/gdata1/gaocs -v /gdata2/gaocs:/gdata2/gaocs --shm-size=16g " \
+    -P /ghome/gaocs \
+    -s "/ghome/gaocs/FCM-NQ/job/cross_eval.sh 0.0005 800 40 1e-4 128 256 8" \
+    bit:5000/gaocs_compressai_llama3_container:2.1.1-cuda12.1-cudnn8-runtime
+

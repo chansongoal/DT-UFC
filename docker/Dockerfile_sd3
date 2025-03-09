@@ -12,10 +12,7 @@ RUN pip install --no-cache-dir \
 
 RUN pip install --no-cache-dir scipy matplotlib 
 
-# RUN apt-get update && \
-#     echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections && \
-#     apt-get install -y fontconfig ttf-mscorefonts-installer && \
-#     fc-cache -fv && \
-#     rm -rf /var/lib/apt/lists/*
+# for 9.99, to solve permission error
+RUN chmod 777 /opt/venv/bin /opt/venv/lib/python3.10/site-packages
 
 CMD ["/bin/bash"]

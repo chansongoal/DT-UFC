@@ -888,16 +888,17 @@ class LlamaModel(LlamaPreTrainedModel):
                 
             #gcs, save or load features here
             if layer_idx == 32:
-                temp_id_file = "/home/gaocs/projects/FCM-LM/Data/llama3/csr/source/temp_id.txt"
+                temp_id_file = "/gdata1/gaocs/Data_FCM_NQ/llama3/csr/source/temp_id.txt"
                 with open(temp_id_file, 'r') as file:
-                    id = file.read().strip(); print('layer_idx, id:', layer_idx, id)
+                    id = file.read().strip()
+                    # print('layer_idx, id:', layer_idx, id)
 
                 # # save original features to disk
                 # hidden_states = layer_outputs[0]    # assign original layer_output[0] to hidden_states
                 # feature = layer_outputs[0]
                 # feature = feature.unsqueeze(0)
                 # feature_np = feature.detach().to(torch.float).cpu().numpy()
-                # save_path = '/home/gaocs/projects/FCM-LM/Data/llama3/csr/feature_test'
+                # save_path = '/gdata1/gaocs/Data_FCM_NQ/llama3/csr/feature_test_3090'
                 # feat_name_org = os.path.join(save_path, id+'.npy')
                 # # feat_name_org = os.path.join(save_path,'arc_'+id+'.npy')
                 # np.save(feat_name_org, feature_np)
@@ -913,11 +914,8 @@ class LlamaModel(LlamaPreTrainedModel):
                 # dequant_feat = quant_feat / scale + min_v
                 # hidden_states = dequant_feat
 
-                # # load reconstructed features from disk
-                # rec_path = '/home/gaocs/projects/FCM-LM/Data/llama3/csr/feature_test'
-                # rec_path = '/home/gaocs/projects/FCM-LM/Data/llama3/csr/hyperprior/postprocessed/trunl-5_trunh5_uniform0_bitdepth1'
-                # rec_path = '/home/gaocs/projects/FCM-LM/Data/llama3/csr/vtm_baseline/postprocessed/trunl-5_trunh5_uniform0_bitdepth10/QP0'
-                rec_path = '/home/gaocs/projects/FCM-LM/Data/llama3/csr/hyperprior/decoded/trunl-5_trunh5_uniform0_bitdepth1/lambda0.01405_epoch200_lr1e-4_bs40_patch64-4096'
+                # load reconstructed features from disk
+                rec_path = '/gdata1/gaocs/Data_FCM_NQ/llama3/csr/feature_test_all'
                 feature_name_rec = os.path.join(rec_path,id+'.npy')
                 # print(feature_name_rec)
                 feature_rec = np.load(feature_name_rec)

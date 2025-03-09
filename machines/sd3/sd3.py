@@ -205,24 +205,25 @@ def tti_pipeline(source_captions_name, org_feature_path, org_image_path, rec_fea
     os.makedirs(org_image_path, exist_ok=True)
     # extract_features_parallel(sd3_pipeline, source_captions, image_names, org_feature_path, org_image_path)
 
-    # Generate images and evaluate 
-    os.makedirs(rec_image_path, exist_ok=True)
-    feat_to_image(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
+    # # Generate images and evaluate 
+    # os.makedirs(rec_image_path, exist_ok=True)
+    # feat_to_image(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
     
     tti_evaluate_fid(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, org_image_path, rec_image_path)
 
-    clip_score_fn = partial(clip_score, model_name_or_path=vae_checkpoint_path)
-    tti_evaluate_clip_score(sd3_pipeline, clip_score_fn, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
+    # clip_score_fn = partial(clip_score, model_name_or_path=vae_checkpoint_path)
+    # tti_evaluate_clip_score(sd3_pipeline, clip_score_fn, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
     
 def vtm_baseline_evaluation():
     # Setup related path
-    source_captions_name = "/home/gaocs/projects/FCM-LM/Data/sd3/tti/source/captions_val2017_select100.txt"
-    vae_checkpoint_path = "/home/gaocs/projects/FCM-LM/Data/sd3/tti/pretrained_head/clip-vit-base-patch16"
-    sd3_checkpoint_path = "/home/gaocs/models/StableDiffusion/stable-diffusion-3-medium-diffusers"
+    data_root = '/gdata1/gaocs/Data_FCM_NQ/sd3/tti'
+    source_captions_name = f"{data_root}/source/captions_val2017_select100.txt"
+    vae_checkpoint_path = f"{data_root}/pretrained_head/clip-vit-base-patch16"
+    sd3_checkpoint_path = f"/home/gaocs/models/StableDiffusion/stable-diffusion-3-medium-diffusers"
 
-    org_feature_path = '/home/gaocs/projects/FCM-LM/Data/sd3/tti/feature_test_all'
-    org_image_path = '/home/gaocs/projects/FCM-LM/Data/sd3/tti/image_test'  # use the images generated from original features as the anchor
-    vtm_root_path = f'/home/gaocs/projects/FCM-LM/Data/sd3/tti/vtm_baseline'; print('vtm_root_path: ', vtm_root_path)
+    org_feature_path = f'{data_root}/feature_test_all'
+    org_image_path = f'{data_root}/image_test'  # use the images generated from original features as the anchor
+    vtm_root_path = f'{data_root}/vtm_baseline'; print('vtm_root_path: ', vtm_root_path)
 
     # Obtain source captions
     source_captions, image_names = get_captions(source_captions_name)
@@ -256,13 +257,14 @@ def vtm_baseline_evaluation():
 
 def hyperprior_baseline_evaluation():
     # Setup related path
-    source_captions_name = "/home/gaocs/projects/FCM-LM/Data/sd3/tti/source/captions_val2017_select100.txt"
-    vae_checkpoint_path = "/home/gaocs/projects/FCM-LM/Data/sd3/tti/pretrained_head/clip-vit-base-patch16"
+    data_root = '/gdata1/gaocs/Data_FCM_NQ/sd3/tti'
+    source_captions_name = f"{data_root}/source/captions_val2017_select100.txt"
+    vae_checkpoint_path = f"{data_root}/pretrained_head/clip-vit-base-patch16"
     sd3_checkpoint_path = "/home/gaocs/models/StableDiffusion/stable-diffusion-3-medium-diffusers"
 
-    org_feature_path = '/home/gaocs/projects/FCM-LM/Data/sd3/tti/feature_test'
-    org_image_path = '/home/gaocs/projects/FCM-LM/Data/sd3/tti/image_test'  # use the images generated from original features as the anchor
-    root_path = f'/home/gaocs/projects/FCM-LM/Data/sd3/tti/hyperprior'; print('root_path: ', root_path)
+    org_feature_path = f'{data_root}/feature_test'
+    org_image_path = f'{data_root}/image_test'  # use the images generated from original features as the anchor
+    root_path = f'{data_root}/hyperprior'; print('root_path: ', root_path)
 
     # Obtain source captions
     source_captions, image_names = get_captions(source_captions_name)
@@ -288,8 +290,8 @@ def hyperprior_baseline_evaluation():
                          f"lambda{lambda_v}_epoch{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}_image"
 
         # # for scaling only 
-        # rec_feature_path = "/home/gaocs/projects/FCM-LM/Data/sd3/tti/hyperprior/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth1"
-        # rec_image_path = "/home/gaocs/projects/FCM-LM/Data/sd3/tti/hyperprior/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth1_image"
+        # rec_feature_path = f"{data_root}/hyperprior/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth1"
+        # rec_image_path = f"{data_root}/hyperprior/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth1_image"
 
         # Generate images 
         os.makedirs(rec_image_path, exist_ok=True)
@@ -309,17 +311,18 @@ def hyperprior_baseline_evaluation():
 # run below to extract original features as the dataset. 
 # You can skip feature extraction if you have download the test dataset from https://drive.google.com/drive/folders/1RZFGlBd6wZr4emuGO4_YJWfKPtAwcMXQ
 if __name__ == "__main__":
-    source_captions_name = "/home/gaocs/projects/FCM-LM/Data/sd3/tti/source/captions_val2017_select100.txt"
-    org_feature_path = '/home/gaocs/projects/FCM-LM/Data/sd3/tti/feature_test'
-    org_image_path = '/home/gaocs/projects/FCM-LM/Data/sd3/tti/image_test'  # use the images generated from original features as the anchor
-    rec_feature_path = '/home/gaocs/projects/FCM-LM/Data/sd3/tti/feature_test'
-    rec_image_path = '/home/gaocs/projects/FCM-LM/Data/sd3/tti/image_test'
-    # rec_feature_path = '/home/gaocs/projects/FCM-LM/Data/sd3/tti/vtm_baseline/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth10/QP0'
-    # rec_image_path = '/home/gaocs/projects/FCM-LM/Data/sd3/tti/vtm_baseline/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth10/QP0_image'
-    # rec_feature_path = '/home/gaocs/projects/FCM-LM/Data/sd3/tti/hyperprior/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth1'
-    # rec_image_path = '/home/gaocs/projects/FCM-LM/Data/sd3/tti/hyperprior/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth1_image'
-    vae_checkpoint_path = "/home/gaocs/projects/FCM-LM/Data/sd3/tti/pretrained_head/clip-vit-base-patch16"
-    sd3_checkpoint_path = "/home/gaocs/models/StableDiffusion/stable-diffusion-3-medium-diffusers"
+    data_root = '/gdata1/gaocs/Data_FCM_NQ/sd3/tti'
+    source_captions_name = f"{data_root}/source/captions_val2017_select500.txt"
+    org_feature_path = f'{data_root}/feature_test_all'
+    org_image_path = f'{data_root}/image_test_500_micl'  # use the images generated from original features as the anchor
+    rec_feature_path = f'{data_root}/feature_test_all'
+    rec_image_path = f'{data_root}/lambda0.02_epoch60_lr1e-4_bs32_patch512-512_image'
+    # rec_feature_path = f'{data_root}/vtm_baseline/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth10/QP0'
+    # rec_image_path = f'{data_root}/vtm_baseline/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth10/QP0_image'
+    # rec_feature_path = f'{data_root}/hyperprior/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth1'
+    # rec_image_path = f'{data_root}/hyperprior/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth1_image'
+    vae_checkpoint_path = f"{data_root}/pretrained_head/clip-vit-base-patch16"
+    sd3_checkpoint_path = "/gdata/liuzj/Data/sd3/tti/pretrained_head/stable-diffusion-3-medium-diffusers"
 
     tti_pipeline(source_captions_name, org_feature_path, org_image_path, rec_feature_path, rec_image_path, vae_checkpoint_path, sd3_checkpoint_path)
 

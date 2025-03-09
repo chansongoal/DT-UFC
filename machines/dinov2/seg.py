@@ -568,16 +568,15 @@ def hyperprior_baseline_evaluation():
     max_v = 103.2168; min_v = -530.9767; trun_high = 5; trun_low = -5
     # lambda_value_all = [0.0005, 0.001, 0.003, 0.007, 0.015]
     lambda_value_all = [0.003]
-    epochs = 400; learning_rate = "0.0001"; batch_size = 128; patch_size = "256 256"   # height first, width later
-
+    epochs = 800; learning_rate = "0.0001"; batch_size = 128; patch_size = "256 256"   # height first, width later
     trun_flag = False
     samples = 10; bit_depth = 8; quant_type = 'kmeans'
 
     if trun_flag == False: trun_high = max_v; trun_low = min_v
-
     for lambda_value in lambda_value_all:
         print(trun_low, trun_high, quant_type, samples, bit_depth)
         print(lambda_value, epochs, learning_rate, batch_size, patch_size)
+        
         rec_feature_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/lambda{lambda_value}_epoch{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}"
 
         all_iou, all_miou, mse_list = seg_evaluate(model, source_img_path, org_feature_path, rec_feature_path, image_list, backbone_model)

@@ -237,18 +237,18 @@ def hyperprior_baseline_evaluation():
         # print(f"Feature MSE: {feat_mse:.8f}")
 
 # # run below to evaluate the reconstructed features
-# if __name__ == "__main__":
-#     # vtm_baseline_evaluation()
-#     hyperprior_baseline_evaluation()
+if __name__ == "__main__":
+    # vtm_baseline_evaluation()
+    hyperprior_baseline_evaluation()
 
 # run below to extract original features as the dataset. 
 # You can skip feature extraction if you have download the test dataset from https://drive.google.com/drive/folders/1RZFGlBd6wZr4emuGO4_YJWfKPtAwcMXQ
-if __name__ == "__main__":
-    backbone_checkpoint_path = '/home/gaocs/models/dinov2/dinov2_vitg14_pretrain.pth'
-    head_checkpoint_path = '/home/gaocs/models/dinov2/dinov2_vitg14_cls_linear_head.pth'
-    source_img_path = '/home/gaocs/projects/FCM-LM/Data/dinov2/cls/source/ImageNet_Selected100'
-    source_label_name = '/home/gaocs/projects/FCM-LM/Data/dinov2/cls/source/imagenet_selected_label100.txt'
-    org_feature_path = '/home/gaocs/projects/FCM-LM/Data/dinov2/cls/feature_test'
-    rec_feature_path = '/home/gaocs/projects/FCM-LM/Data/dinov2/cls/feature_test'
+# if __name__ == "__main__":
+#     backbone_checkpoint_path = '/home/gaocs/models/dinov2/dinov2_vitg14_pretrain.pth'
+#     head_checkpoint_path = '/home/gaocs/models/dinov2/dinov2_vitg14_cls_linear_head.pth'
+#     source_img_path = '/home/gaocs/projects/FCM-LM/Data/dinov2/cls/source/ImageNet_Selected100'
+#     source_label_name = '/home/gaocs/projects/FCM-LM/Data/dinov2/cls/source/imagenet_selected_label100.txt'
+#     org_feature_path = '/home/gaocs/projects/FCM-LM/Data/dinov2/cls/feature_test'
+#     rec_feature_path = '/home/gaocs/projects/FCM-LM/Data/dinov2/cls/feature_test'
 
-    cls_pipeline(backbone_checkpoint_path, head_checkpoint_path, source_img_path, source_label_name, org_feature_path, rec_feature_path)
+#     cls_pipeline(backbone_checkpoint_path, head_checkpoint_path, source_img_path, source_label_name, org_feature_path, rec_feature_path)

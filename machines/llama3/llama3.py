@@ -102,8 +102,9 @@ class ARCChallengeSolver:
                 return_full_text=0,
                 do_sample=False # guarantee the output is the same 
             )
-            # print(f"prompt: {prompt}\n")
-            # print(f"prediction: {result}\n")
+            print(self.ids[i])
+            print(f"prompt: {prompt}\n")
+            print(f"prediction: {result}\n")
             result_dict = {
                 "prompt": prompt,
                 "answer": result
@@ -159,10 +160,10 @@ class ARCChallengeSolver:
         print(f"Accuracy: {accuracy*100:.4f}")
 
 if __name__ == "__main__":
-    model_path = "/home/gaocs/models/llama/Meta-Llama-3-8B-Instruct"
-    org_json_path = "/home/gaocs/projects/FCM-LM/Data/llama3/csr/source/arc_challenge_sampled_longest100.jsonl"
+    model_path = "/gdata2/gaocs/pretrained_models/llama/Meta-Llama-3-8B-Instruct"
+    org_json_path = "/gdata1/gaocs/Data_FCM_NQ/llama3/csr/source/arc_challenge_sampled_longest500.jsonl"
     result_json_path = 'result.json'
-    temp_id_file = "/home/gaocs/projects/FCM-LM/Data/llama3/csr/source/temp_id.txt"
+    temp_id_file = "/gdata1/gaocs/Data_FCM_NQ/llama3/csr/source/temp_id.txt"
 
     solver = ARCChallengeSolver(model_path, org_json_path, result_json_path, temp_id_file)
     solver.llama_pipeline()
