@@ -56,8 +56,13 @@ from compressai.zoo.image_vbr import model_architectures as architectures_vbr
 
 #gcs
 import numpy as np 
-from compressai.datasets import FeatureFolder
+import os
+# from compressai.datasets import FeatureFolder
 import copy
+#gcs, import preprocessing
+preprocessing_path = '/ghome/gaocs/FCM-NQ/coding/NQ'
+sys.path.append(preprocessing_path)
+import nonlinear_quant
 
 torch.backends.cudnn.deterministic = True
 torch.set_num_threads(1)
@@ -180,6 +185,8 @@ def load_pretrained(model: str, metric: str, quality: int) -> nn.Module:
 def load_checkpoint(arch: str, no_update: bool, checkpoint_path: str) -> nn.Module:
     # update model if need be
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+    #gcs, print best epoch
+    print(f"Best epoch from checkpoint: {checkpoint['epoch']}")
     state_dict = checkpoint
     # compatibility with 'not updated yet' trained nets
     for key in ["network", "state_dict", "model_state_dict"]:
@@ -203,6 +210,11 @@ def load_checkpoint(arch: str, no_update: bool, checkpoint_path: str) -> nn.Modu
 
     return net.eval()
 
+#gcs, define a function to read source file
+def get_feature_names(feat_path, source_file):
+    with open(source_file, "r", encoding="utf-8") as file:
+        return [Path(os.path.join(feat_path, line.strip().split()[0].split('.')[0]+'.npy')) for line in file if line.strip()]
+
 
 def eval_model(
     model: nn.Module,
@@ -220,9 +232,14 @@ def eval_model(
     metrics = defaultdict(float)
     is_vbr_model = args["architecture"].endswith("-vbr")
     #gcs
-    model_type = args['model_type']; task = args["task"]; trun_flag = args["trun_flag"]; trun_low = args["trun_low"]
-    trun_high = args['trun_high']; quant_type = args['quant_type']; qsamples = args['qsamples']; bit_depth = args['bit_depth']; quant_points_name = args['quant_points_name']
-
+    model_type = args['model_type']; task = args["task"]; trun_flag = args["trun_flag"]; trun_low = args["trun_low"]; trun_high = args['trun_high']
+    quant_type = args['quant_type']; qsamples = args['qsamples']; bit_depth = args['bit_depth']; quant_points_name = args['quant_points_name']
+    print(model_type, task, trun_flag, trun_low, trun_high, quant_type, qsamples, bit_depth, quant_points_name)
+    #gcs,
+    # print(filepaths)
+    source_file = args['source_file']
+    filepaths = get_feature_names(args['dataset'], source_file)
+    print(f"{len(filepaths)} features in {args['dataset']} are tested.")
     for filepath in filepaths:
         #gcs, load feature in the same way of training
         feat = np.load(filepath)
@@ -230,11 +247,13 @@ def eval_model(
         N, C, H, W = feat.shape
         #gcs, preprocessing
         if not args["half"]: feat = feat.astype(np.float32)
-        if trun_flag == True: feat = FeatureFolder.truncation(feat, trun_low, trun_high)
-        # feat = FeatureFolder.uniform_quantization(feat, trun_low, trun_high, bit_depth)
-        quantization_points = FeatureFolder.load_quantization_points(quant_points_name)
-        feat = FeatureFolder.nonlinear_quantization(feat, quantization_points, bit_depth)
-        feat = FeatureFolder.packing(feat, model_type)
+        if trun_flag == 'True': feat = nonlinear_quant.truncation(feat, trun_low, trun_high)
+        if quant_type == 'uniform':
+            feat = nonlinear_quant.uniform_quantization(feat, trun_low, trun_high, bit_depth)
+        elif quant_type == 'kmeans':
+            quantization_points = nonlinear_quant.load_quantization_points(quant_points_name)
+            feat = nonlinear_quant.nonlinear_quantization(feat, quantization_points, bit_depth)
+        feat = nonlinear_quant.packing(feat, model_type)
         x = torch.from_numpy(feat).to(device)
         x = x.unsqueeze(0); x = x.unsqueeze(0) # reshape to [1,1,H,W]
 
@@ -251,9 +270,11 @@ def eval_model(
             #gcs, postprocessing
             rec_feat = rec_feat.squeeze(0); rec_feat = rec_feat.squeeze(0)
             rec_feat = rec_feat.cpu().detach().numpy()
-            rec_feat = FeatureFolder.unpacking(rec_feat, [N, C, H, W], model_type)
-            # rec_feat = FeatureFolder.uniform_dequantization(rec_feat, trun_low, trun_high, bit_depth)
-            rec_feat = FeatureFolder.nonlinear_dequantization(rec_feat, quantization_points, bit_depth)
+            rec_feat = nonlinear_quant.unpacking(rec_feat, [N, C, H, W], model_type)
+            if quant_type == 'uniform':
+                rec_feat = nonlinear_quant.uniform_dequantization(rec_feat, trun_low, trun_high, bit_depth)
+            elif quant_type == 'kmeans':
+                rec_feat = nonlinear_quant.nonlinear_dequantization(rec_feat, quantization_points, bit_depth)
             # Feature dtype
             dtype = np.float16 if model_type=='sd3' else np.float32
             rec_feat = rec_feat.astype(dtype)
@@ -371,8 +392,8 @@ def setup_args():
     parent_parser.add_argument(
         "-trun_flag",
         "--trun_flag",
-        type=bool,
-        default=True,
+        type=str,
+        default='False',
         help="Please input the trun_flag.",
     )
     parent_parser.add_argument(
@@ -416,6 +437,13 @@ def setup_args():
         type=str,
         default="quant_points_name.json",
         help="Please input the quant_points_name.",
+    )
+    parent_parser.add_argument(
+        "-source_file",
+        "--source_file",
+        type=str,
+        default="source_file.txt",
+        help="Please input the source_file.",
     )
     parent_parser.add_argument(
         "-o",
@@ -496,6 +524,7 @@ def main(argv):  # noqa: C901
 
     filepaths = collect_images(args.dataset)
     if len(filepaths) == 0:
+        print(args.dataset)
         print("Error: no images found in directory.", file=sys.stderr)
         raise SystemExit(1)
 

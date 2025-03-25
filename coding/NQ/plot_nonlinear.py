@@ -238,17 +238,17 @@ def plot_quantization_mapping(data, uniform_points, density_points, kmeans_point
     plt.tight_layout()
     plt.savefig(pdf_name, dpi=600, format='pdf')
 
-def plot_quantization_intervals(quantization_mapping_name, task, trun_low, trun_high, quant_type, samples, bit_depth):
+def plot_quantization_intervals(quantization_mapping_name, pdf_name, task, trun_low, trun_high, quant_type, samples, bit_depth):
     if quant_type == 'uniform': return
     quantization_mapping = load_quantization_points(quantization_mapping_name)
     if task == 'dpt':
         for ch in range(len(quantization_mapping)):
             suffix = f"ch{ch}" 
             mapping = quantization_mapping[ch]
-            pdf_name = f'./quantization_visualization/{task}/quantization_mapping_{task}_{suffix}_trunl{trun_low}_trunh{trun_high}_{quant_type}_{samples}_bitdepth{bit_depth}.pdf'
+            # pdf_name = f'./quantization_visualization/{task}/quantization_mapping_{task}_{suffix}_trunl{trun_low}_trunh{trun_high}_{quant_type}_{samples}_bitdepth{bit_depth}.pdf'
             visualize_quantization_intervals(mapping, pdf_name)
     else:
-        pdf_name = f'./quantization_visualization/{task}/quantization_mapping_{task}_trunl{trun_low}_trunh{trun_high}_{quant_type}_{samples}_bitdepth{bit_depth}.pdf'
+        # pdf_name = f'./quantization_visualization/{task}/quantization_mapping_{task}_trunl{trun_low}_trunh{trun_high}_{quant_type}_{samples}_bitdepth{bit_depth}.pdf'
         visualize_quantization_intervals(quantization_mapping, pdf_name)
 
 def visualize_quantization_intervals(quantization_points, pdf_name):
@@ -257,7 +257,7 @@ def visualize_quantization_intervals(quantization_points, pdf_name):
 
     # quantization_intervals = np.log(quantization_intervals + 1e-12)
     # quantization_intervals = np.sqrt(quantization_intervals)
-    quantization_intervals = np.tanh(5*quantization_intervals)
+    # quantization_intervals = np.tanh(5*quantization_intervals)
     
     fontsize=26
     font = {'family': 'Times New Roman', 'size': fontsize}
@@ -274,7 +274,7 @@ def visualize_quantization_intervals(quantization_points, pdf_name):
     plt.savefig(pdf_name, dpi=600, format='pdf')
 
 
-def quant_visualization(org_feat_path, vtm_root_path, quantization_mapping_name, model_type, trun_flag, samples, trun_high, trun_low, quant_type, bit_depth):
+def quant_visualization(org_feat_path, quantization_mapping_name, pdf_name, model_type, trun_flag, samples, trun_high, trun_low, quant_type, bit_depth):
     # Set related paths
     feat_names = os.listdir(org_feat_path)
     feat_names = feat_names[:1]
@@ -329,57 +329,45 @@ def quant_visualization(org_feat_path, vtm_root_path, quantization_mapping_name,
             quant_feat_list = quant_feat_list_all[:, :, ch, :, :]
             dequant_feat_list = dequant_feat_list_all[:, :, ch, :, :]
             suffix = f"ch{ch}" 
-            plot_quantized_data_hist(quant_feat_list, not trun_flag, f'./quantization_visualization/{task}/quantized_data_{task}_{suffix}_trunl{trun_low}_trunh{trun_high}_{quant_type}_{samples}_bitdepth{bit_depth}.pdf', bit_depth)
+            # plot_quantized_data_hist(quant_feat_list, not trun_flag, f'./quantization_visualization/{task}/quantized_data_{task}_{suffix}_trunl{trun_low}_trunh{trun_high}_{quant_type}_{samples}_bitdepth{bit_depth}.pdf', bit_depth)
+            plot_quantized_data_hist(quant_feat_list, not trun_flag, pdf_name, bit_depth)
             feat_mse = np.mean((trun_feat_list-dequant_feat_list)**2)
             print(f"Feature MSE: {feat_mse:.8f}")
             # break
     else:
         # Process all features together for other tasks
-        plot_quantized_data_hist(quant_feat_list_all, not trun_flag, f'./quantization_visualization/{task}/quantized_data_{task}_trunl{trun_low}_trunh{trun_high}_{quant_type}_{samples}_bitdepth{bit_depth}.pdf', bit_depth)
+        # plot_quantized_data_hist(quant_feat_list_all, not trun_flag, f'./quantization_visualization/{task}/quantized_data_{task}_trunl{trun_low}_trunh{trun_high}_{quant_type}_{samples}_bitdepth{bit_depth}.pdf', bit_depth)
+        plot_quantized_data_hist(quant_feat_list_all, not trun_flag, pdf_name, bit_depth)
         feat_mse = np.mean((trun_feat_list_all-dequant_feat_list_all)**2)
         print(f"Feature MSE: {feat_mse:.8f}")
 
 
 
 if __name__ == "__main__":
-    # model_type = 'llama3'; task = 'csr'
-    # max_v = 47.75; min_v = -78; trun_high = 5; trun_low = -5
+    model_type = 'llama3'; task = 'csr'; trun_high = 0; trun_low = 0
 
-    model_type = 'dinov2'; task = 'cls'
-    max_v = 104.1752; min_v = -552.4510; trun_high = 30; trun_low = -30
+    model_type = 'dinov2'; task = 'seg'; trun_high = 0; trun_low = 0
 
-    # model_type = 'dinov2'; task = 'seg'
-    # max_v = 103.2168; min_v = -530.9767; trun_high = 20; trun_low = -20
+    model_type = 'sd3'; task = 'tti'; trun_high = 0; trun_low = 0
 
-    # model_type = 'dinov2'; task = 'dpt'
-    # max_v = [3.2777, 5.0291, 25.0456, 102.0307]; min_v = [-2.4246, -26.8908, -323.2952, -504.4310]; trun_high = [1, 2, 10, 20]; trun_low = [-1, -2, -10, -20]
-    
-    # model_type = 'sd3'; task = 'tti'
-    # max_v = 3.0527; min_v = -4.0938; trun_high = 3.0527; trun_low = -4.0938 
 
     trun_flag = False; quant_type = 'kmeans'; samples = 10; bit_depth = 8
-    if trun_flag == False: trun_high = max_v; trun_low = min_v
+    if trun_flag == False: trun_high = 0; trun_low = 0
 
-    quant_type_all = ['uniform', 'density', 'kmeans']
-    # quant_type_all = ['density']
     bit_depth_all = [8]
 
-    org_feat_path = f'/home/gaocs/projects/FCM-LM/Data/{model_type}/{task}/feature_test'; print('org_feat_path: ', org_feat_path)
-    vtm_root_path = f'/home/gaocs/projects/FCM-LM/Data/{model_type}/{task}/vtm'; print('vtm_root_path: ', vtm_root_path)
+    org_feat_path = f'/gdata1/gaocs/FCM_LM_Test_Dataset/{model_type}/{task}/feature'
+    quant_mapping_path = f'/gdata1/gaocs/Data_FCM_NQ/{model_type}/{task}/quantization_mapping'
+
 
     for bit_depth in bit_depth_all:
-        for quant_type in quant_type_all:  
-            if task == 'dpt':
-                quantization_mapping_name = []
-                for ch in range(len(trun_high)):
-                    quant_mapping_name = f'/home/gaocs/projects/FCM-LM/Code/vtm_coding/quantization_mapping/{task}/quantization_mapping_{task}_ch{ch}_trunl{trun_low}_trunh{trun_high}_{quant_type}_{samples}_bitdepth{bit_depth}.json'
-                    quantization_mapping_name.append(quant_mapping_name)
-            else:
-                quantization_mapping_name = f'/home/gaocs/projects/FCM-LM/Code/vtm_coding/quantization_mapping/{task}/quantization_mapping_{task}_trunl{trun_low}_trunh{trun_high}_{quant_type}_{samples}_bitdepth{bit_depth}.json'
-            # print('quantization_mapping_name: ', quantization_mapping_name)
-            
-            print(model_type, task, trun_flag, quant_type, samples, max_v, min_v, trun_high, trun_low, bit_depth)
-            quant_visualization(org_feat_path, vtm_root_path, quantization_mapping_name, model_type, trun_flag, samples, trun_high, trun_low, quant_type, bit_depth)
+        quantization_mapping_name = f"{quant_mapping_path}/quantization_mapping_{task}_trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}.json"
+        # print('quantization_mapping_name: ', quantization_mapping_name)
+        
+        print(model_type, task, trun_flag, quant_type, samples, trun_high, trun_low, bit_depth)
+        # pdf_name = f"{quant_mapping_path}/quant_visualization_{task}_trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}.pdf"
+        # quant_visualization(org_feat_path, quantization_mapping_name, pdf_name, model_type, trun_flag, samples, trun_high, trun_low, quant_type, bit_depth)
 
-            # Plot quantization mapping
-            plot_quantization_intervals(quantization_mapping_name, task, trun_low, trun_high, quant_type, samples, bit_depth)
+        # Plot quantization mapping
+        pdf_name = f"{quant_mapping_path}/quant_mapping_{task}_trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}.pdf"
+        plot_quantization_intervals(quantization_mapping_name, pdf_name, task, trun_low, trun_high, quant_type, samples, bit_depth)

@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 from functools import partial
 import torch
+import argparse
 from diffusers import StableDiffusion3Pipeline
 from torchmetrics.functional.multimodal import clip_score
 from torchmetrics.image.fid import FrechetInceptionDistance
@@ -203,127 +204,131 @@ def tti_pipeline(source_captions_name, org_feature_path, org_image_path, rec_fea
     # Extract features
     os.makedirs(org_feature_path, exist_ok=True)
     os.makedirs(org_image_path, exist_ok=True)
-    # extract_features_parallel(sd3_pipeline, source_captions, image_names, org_feature_path, org_image_path)
+    extract_features_parallel(sd3_pipeline, source_captions, image_names, org_feature_path, org_image_path)
 
     # # Generate images and evaluate 
     # os.makedirs(rec_image_path, exist_ok=True)
     # feat_to_image(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
     
-    tti_evaluate_fid(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, org_image_path, rec_image_path)
+    # tti_evaluate_fid(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, org_image_path, rec_image_path)
 
     # clip_score_fn = partial(clip_score, model_name_or_path=vae_checkpoint_path)
     # tti_evaluate_clip_score(sd3_pipeline, clip_score_fn, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
     
-def vtm_baseline_evaluation():
+def quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file):
     # Setup related path
-    data_root = '/gdata1/gaocs/Data_FCM_NQ/sd3/tti'
-    source_captions_name = f"{data_root}/source/captions_val2017_select100.txt"
-    vae_checkpoint_path = f"{data_root}/pretrained_head/clip-vit-base-patch16"
-    sd3_checkpoint_path = f"/home/gaocs/models/StableDiffusion/stable-diffusion-3-medium-diffusers"
-
-    org_feature_path = f'{data_root}/feature_test_all'
-    org_image_path = f'{data_root}/image_test'  # use the images generated from original features as the anchor
-    vtm_root_path = f'{data_root}/vtm_baseline'; print('vtm_root_path: ', vtm_root_path)
-
-    # Obtain source captions
-    source_captions, image_names = get_captions(source_captions_name)
-
-    # Setup models
-    sd3_pipeline = StableDiffusion3Pipeline.from_pretrained(sd3_checkpoint_path, torch_dtype=torch.float16)
-    sd3_pipeline.enable_model_cpu_offload()
-
-    max_v = 4.668; min_v = -6.176; trun_high = 4.668; trun_low = -6.176
-    QPs = [22, 27, 32, 37, 42]
-    
-    trun_flag = False
-    samples = 0; bit_depth = 10; quant_type = 'uniform'
-    
-    if trun_flag == False: trun_high = max_v; trun_low = min_v
-
-    for QP in QPs:
-        print(trun_flag, quant_type, samples, max_v, min_v, trun_high, trun_low, bit_depth, QP)
-        rec_feature_path = f"{vtm_root_path}/postprocessed/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/QP{QP}"
-        rec_image_path = f"{vtm_root_path}/postprocessed/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/QP{QP}_image"
-
-        # Generate images 
-        os.makedirs(rec_image_path, exist_ok=True)
-        feat_to_image(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
-        
-        # Evaluation
-        tti_evaluate_fid(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, org_image_path, rec_image_path)
-
-        clip_score_fn = partial(clip_score, model_name_or_path=vae_checkpoint_path)
-        tti_evaluate_clip_score(sd3_pipeline, clip_score_fn, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
-
-def hyperprior_baseline_evaluation():
-    # Setup related path
-    data_root = '/gdata1/gaocs/Data_FCM_NQ/sd3/tti'
-    source_captions_name = f"{data_root}/source/captions_val2017_select100.txt"
-    vae_checkpoint_path = f"{data_root}/pretrained_head/clip-vit-base-patch16"
-    sd3_checkpoint_path = "/home/gaocs/models/StableDiffusion/stable-diffusion-3-medium-diffusers"
-
-    org_feature_path = f'{data_root}/feature_test'
-    org_image_path = f'{data_root}/image_test'  # use the images generated from original features as the anchor
-    root_path = f'{data_root}/hyperprior'; print('root_path: ', root_path)
-
-    # Obtain source captions
-    source_captions, image_names = get_captions(source_captions_name)
-
-    # Setup models
-    sd3_pipeline = StableDiffusion3Pipeline.from_pretrained(sd3_checkpoint_path, torch_dtype=torch.float16)
-    sd3_pipeline.enable_model_cpu_offload()
-
-    max_v = 4.668; min_v = -6.176; trun_high = 4.668; trun_low = -6.176
-    lambda_value_all = [0.005, 0.01, 0.02, 0.05, 0.2]
-    epochs = 60; learning_rate = "1e-4"; batch_size = 32; patch_size = "512 512"   # height first, width later
-
-    trun_flag = False
-    samples = 0; bit_depth = 1; quant_type = 'uniform'
-    
-    if trun_flag == False: trun_high = max_v; trun_low = min_v
-
-    for lambda_v in lambda_value_all:
-        print(trun_flag, quant_type, samples, max_v, min_v, trun_high, trun_low, bit_depth, lambda_v)
-        rec_feature_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/" \
-                           f"lambda{lambda_v}_epoch{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}"
-        rec_image_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/" \
-                         f"lambda{lambda_v}_epoch{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}_image"
-
-        # # for scaling only 
-        # rec_feature_path = f"{data_root}/hyperprior/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth1"
-        # rec_image_path = f"{data_root}/hyperprior/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth1_image"
-
-        # Generate images 
-        os.makedirs(rec_image_path, exist_ok=True)
-        feat_to_image(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
-        
-        # Evaluation
-        tti_evaluate_fid(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, org_image_path, rec_image_path)
-
-        clip_score_fn = partial(clip_score, model_name_or_path=vae_checkpoint_path)
-        tti_evaluate_clip_score(sd3_pipeline, clip_score_fn, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
-
-# if __name__ == "__main__":
-#     # vtm_baseline_evaluation()
-#     hyperprior_baseline_evaluation()
-
-
-# run below to extract original features as the dataset. 
-# You can skip feature extraction if you have download the test dataset from https://drive.google.com/drive/folders/1RZFGlBd6wZr4emuGO4_YJWfKPtAwcMXQ
-if __name__ == "__main__":
-    data_root = '/gdata1/gaocs/Data_FCM_NQ/sd3/tti'
-    source_captions_name = f"{data_root}/source/captions_val2017_select500.txt"
-    org_feature_path = f'{data_root}/feature_test_all'
-    org_image_path = f'{data_root}/image_test_500_micl'  # use the images generated from original features as the anchor
-    rec_feature_path = f'{data_root}/feature_test_all'
-    rec_image_path = f'{data_root}/lambda0.02_epoch60_lr1e-4_bs32_patch512-512_image'
-    # rec_feature_path = f'{data_root}/vtm_baseline/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth10/QP0'
-    # rec_image_path = f'{data_root}/vtm_baseline/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth10/QP0_image'
-    # rec_feature_path = f'{data_root}/hyperprior/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth1'
-    # rec_image_path = f'{data_root}/hyperprior/postprocessed/trunl-6.176_trunh4.668_uniform0_bitdepth1_image'
-    vae_checkpoint_path = f"{data_root}/pretrained_head/clip-vit-base-patch16"
+    dataset_root = '/gdata1/gaocs/FCM_LM_Test_Dataset/sd3/tti'
+    source_captions_name = f"{dataset_root}/source/{source_file}"
     sd3_checkpoint_path = "/gdata/liuzj/Data/sd3/tti/pretrained_head/stable-diffusion-3-medium-diffusers"
 
-    tti_pipeline(source_captions_name, org_feature_path, org_image_path, rec_feature_path, rec_image_path, vae_checkpoint_path, sd3_checkpoint_path)
+    org_feature_path = f'{dataset_root}/feature'
+    org_image_path = f'{dataset_root}/image'  # use the images generated from original features as the anchor
+
+    root_path = f'/gdata1/gaocs/Data_FCM_NQ/sd3/tti'; print('root_path: ', root_path)
+
+    # Obtain source captions
+    source_captions, image_names = get_captions(source_captions_name)
+
+    # Setup models
+    sd3_pipeline = StableDiffusion3Pipeline.from_pretrained(sd3_checkpoint_path, torch_dtype=torch.float16)
+    sd3_pipeline.enable_model_cpu_offload()
+
+    # Evaluate and print results
+    bit_depth_all = [10, 8]
+
+    for bit_depth in bit_depth_all:
+        print(source_file, trun_low, trun_high, quant_type, samples, bit_depth)
+        rec_feature_path = f"{root_path}/quantization/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}/bitdepth{bit_depth}"
+        rec_image_path = f"{rec_feature_path}_image"
+
+        # Generate images 
+        os.makedirs(rec_image_path, exist_ok=True)
+        feat_to_image(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
+        
+        # Evaluation
+        tti_evaluate_fid(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, org_image_path, rec_image_path)
+
+def compressai_evaluation(arch, trun_low, trun_high, quant_type, samples, bit_depth, train_task, lambda_value_all, epochs, learning_rate, batch_size, patch_size):
+    # Setup related path
+    dataset_root = '/gdata1/gaocs/FCM_LM_Test_Dataset/sd3/tti'
+    source_captions_name = f"{dataset_root}/source/captions_val2017_select500.txt"
+    sd3_checkpoint_path = "/gdata/liuzj/Data/sd3/tti/pretrained_head/stable-diffusion-3-medium-diffusers"
+
+    org_feature_path = f'{dataset_root}/feature'
+    org_image_path = f'{dataset_root}/image'  # use the images generated from original features as the anchor
+
+    root_path = f'/gdata1/gaocs/Data_FCM_NQ/sd3/tti/{arch}'; print('root_path: ', root_path)
+
+    # Obtain source captions
+    source_captions, image_names = get_captions(source_captions_name)
+
+    # Setup models
+    sd3_pipeline = StableDiffusion3Pipeline.from_pretrained(sd3_checkpoint_path, torch_dtype=torch.float16)
+    sd3_pipeline.enable_model_cpu_offload()
+
+    for lambda_value in lambda_value_all:
+        print(arch, trun_low, trun_high, quant_type, samples, bit_depth, lambda_value, epochs, learning_rate, batch_size, patch_size)
+        if train_task == 'tti':
+            rec_feature_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/" \
+                           f"lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size}"
+        else:
+            rec_feature_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/" \
+                            f"trained_{train_task}_lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size}"
+        rec_image_path = f"{rec_feature_path}_image"
+
+        # Generate images 
+        os.makedirs(rec_image_path, exist_ok=True)
+        feat_to_image(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
+        
+        # Evaluation
+        tti_evaluate_fid(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, org_image_path, rec_image_path)
+
+def argument_parsing():
+    parser = argparse.ArgumentParser(description="Train Evaluation Pipeline")
+    parser.add_argument('--arch', type=str, default='bmshj2018-hyperprior', help='arch')
+    parser.add_argument('--trun_low', type=float, default=-506.97, help='trun_low')
+    parser.add_argument('--trun_high', type=float, default=105.95, help='trun_high')
+    parser.add_argument('--quant_type', type=str, default='kmeans', help='quant_type')
+    parser.add_argument('--samples', type=int, default=10, help='samples')
+    parser.add_argument('--bit_depth', type=int, default=8, help='bit_depth')
+    parser.add_argument('--train_task', type=str, default='seg', help='train_task')
+    parser.add_argument('--lambda_value_all', nargs='+', type=float, help='lambda_value_all')
+    parser.add_argument('--epochs', type=int, default=200, help='epochs')
+    parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning_rate')
+    parser.add_argument('--batch_size', type=int, default=16, help='batch_size')
+    parser.add_argument('--patch_size', type=str, default='256-256', help='patch_size')
+    
+    args = parser.parse_args()
+    
+    return args
+
+if __name__ == "__main__":
+    args = argument_parsing()
+    arch = args.arch
+    trun_low = args.trun_low
+    trun_high = args.trun_high
+    quant_type = args.quant_type
+    samples = args.samples
+    bit_depth = args.bit_depth
+    train_task = args.train_task
+    lambda_value_all = args.lambda_value_all
+    epochs = args.epochs
+    learning_rate = args.learning_rate
+    batch_size = args.batch_size
+    patch_size = args.patch_size
+
+    compressai_evaluation(arch, trun_low, trun_high, quant_type, samples, bit_depth, train_task, lambda_value_all, epochs, learning_rate, batch_size, patch_size)
 
 
+    # # for quantization evaluation
+    # trun_high = 4.46; trun_low = -5.79 
+    # source_file = 'captions_val2017_select100.txt'
+    # quant_type = 'kmeans'; samples = 10
+    # quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file)
+    # # quant_type = 'uniform'; samples = 0
+    # # quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file)
+    # source_file = 'captions_val2017_select500.txt'
+    # quant_type = 'kmeans'; samples = 10
+    # quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file)
+    # # quant_type = 'uniform'; samples = 0
+    # # quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file)

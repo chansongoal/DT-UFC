@@ -29,6 +29,7 @@
 
 from torch.hub import load_state_dict_from_url
 
+# lzj
 from compressai.models import (
     Cheng2020Anchor,
     Cheng2020Attention,
@@ -37,6 +38,7 @@ from compressai.models import (
     JointAutoregressiveHierarchicalPriors,
     MeanScaleHyperprior,
     ScaleHyperprior,
+    Elic2022Official,
 )
 
 from .pretrained import load_pretrained
@@ -49,6 +51,7 @@ __all__ = [
     "mbt2018_mean",
     "cheng2020_anchor",
     "cheng2020_attn",
+    "elic2022_official",
 ]
 
 model_architectures = {
@@ -59,6 +62,7 @@ model_architectures = {
     "mbt2018": JointAutoregressiveHierarchicalPriors,
     "cheng2020-anchor": Cheng2020Anchor,
     "cheng2020-attn": Cheng2020Attention,
+    "elic2022-official": Elic2022Official,
 }
 
 root_url = "https://compressai.s3.amazonaws.com/models/v1"
@@ -256,6 +260,16 @@ cfgs = {
         5: (192,),
         6: (192,),
     },
+    # lzj
+    "elic2022-official": {
+        1: (192, 320, [16, 16, 32, 64, 192]),
+        2: (192, 320, [16, 32, 32, 64, 176]),  
+        3: (192, 320, [16, 32, 48, 64, 160]),  
+        4: (192, 384, [16, 48, 64, 80, 176]),  
+        5: (192, 384, [16, 64, 80, 96, 128]),  
+        6: (192, 448, [16, 64, 128, 128, 112]),  
+        7: (192, 448, [16, 96, 128, 144, 64]),  
+    },
 }
 
 
@@ -447,3 +461,29 @@ def cheng2020_attn(quality, metric="mse", pretrained=False, progress=True, **kwa
     return _load_model(
         "cheng2020-attn", metric, quality, pretrained, progress, **kwargs
     )
+
+# lzj
+def elic2022_official(quality, metric="mse", pretrained=False, progress=True, **kwargs):
+    r"""ELIC 2022; uneven channel groups with checkerboard spatial context.
+    Context model from [He2022].
+
+    [He2022]: `"ELIC: Efficient Learned Image Compression with
+    Unevenly Grouped Space-Channel Contextual Adaptive Coding"
+    <https://arxiv.org/abs/2203.10886>`_, by Dailan He, Ziming Yang,
+    Weikun Peng, Rui Ma, Hongwei Qin, and Yan Wang, CVPR 2022.
+
+    Args:
+        quality (int): Quality levels (1: lowest, highest: 7)
+        metric (str): Optimized metric, choose from ('mse', 'ms-ssim')
+        pretrained (bool): If True, returns a pre-trained model
+        progress (bool): If True, displays a progress bar of the download to stderr
+    """    
+    if metric not in ("mse", "ms-ssim"):
+        raise ValueError(f'Invalid metric "{metric}"')
+
+    if quality < 1 or quality > 7:
+        raise ValueError(f'Invalid quality "{quality}", should be between (1, 7)')
+
+    return _load_model(
+        "elic2022-official", metric, quality, pretrained, progress, **kwargs
+    )   

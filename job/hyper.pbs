@@ -1,0 +1,21 @@
+#PBS -N tti_hy_km
+#PBS -o /ghome/gaocs/FCM-NQ/err_out/tti_hy_km.out
+#PBS -e /ghome/gaocs/FCM-NQ/err_out/tti_hy_km.err
+#PBS -l nodes=1:gpus=1:A,walltime=350:00:00
+#PBS -r y
+cd $PBS_O_WORKDIR
+echo Time is `date`
+echo Directory is $PWD
+echo This job runs on following nodes and gpus:
+cat $PBS_NODEFILE
+cat $PBS_GPUFILE
+
+# -s "/ghome/gaocs/FCM-NQ/job/compressai.sh tti bmshj2018-hyperprior 0.05 400 400 1e-4 128 256-256 kmeans 10 8 None" \
+# -s "/ghome/gaocs/FCM-NQ/job/compressai.sh tti bmshj2018-hyperprior 0.05 400 400 1e-4 128 256-256 kmeans 10 8  \
+#        /gdata1/gaocs/Data_FCM_NQ/sd3/tti/hyperprior/training_models/trunl-5.79_trunh4.46_kmeans10_bitdepth8/bmshj2018-hyperprior_lambda0.05_epochs200_lr0.0001_bs128_patch256-256_checkpoint_best.pth.tar" \
+
+startdocker -u " -v /gdata/gaocs:/gdata/gaocs  -v /gdata1/gaocs:/gdata1/gaocs -v /gdata2/gaocs:/gdata2/gaocs --shm-size=16g " \
+    -P /ghome/gaocs \
+    -s "/ghome/gaocs/FCM-NQ/job/compressai.sh tti bmshj2018-hyperprior 0.05 600 600 1e-4 32 512-512 kmeans 10 8 None" \
+    bit:5000/gaocs_compressai_llama3_container:2.1.1-cuda12.1-cudnn8-runtime
+

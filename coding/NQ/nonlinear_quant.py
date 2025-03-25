@@ -30,7 +30,7 @@ def uniform_quantization(feat, min_v, max_v, bit_depth):
         scale = ((2**bit_depth) -1) / (max_v - min_v)
         quant_feat = ((feat-min_v) * scale)
 
-    quant_feat = quant_feat.astype(np.uint16) if bit_depth>8 else quant_feat.astype(np.uint8)
+    # quant_feat = quant_feat.astype(np.uint16) if bit_depth>8 else quant_feat.astype(np.uint8) # only use it to save yuv
     return quant_feat
 
 def uniform_dequantization(feat, min_v, max_v, bit_depth):
@@ -197,7 +197,7 @@ def load_quantization_points(file_path: Union[str, list[str]]):
     def load_file(path):
         with open(path, 'r') as f:
             quantization_points = np.array(json.load(f))
-        print(f"Quantization points loaded from {path}")
+        # print(f"Quantization points loaded from {path}")
         return quantization_points
 
     if isinstance(file_path, list):
@@ -305,7 +305,7 @@ def nonlinear_fitting(org_feat_path, quant_mapping_path, model_type, task, sampl
         quant_type (str): Quantization type.
         bit_depth (int): Bit depth for quantization.
     """
-    feat_names = os.listdir(org_feat_path)[:samples]
+    feat_names = sorted(os.listdir(org_feat_path))[:samples]
     feat_list_all = []
 
     # Load and preprocess features
@@ -313,7 +313,7 @@ def nonlinear_fitting(org_feat_path, quant_mapping_path, model_type, task, sampl
         org_feat_name = os.path.join(org_feat_path, feat_name)
         org_feat = np.load(org_feat_name)
         N, C, H, W = org_feat.shape
-        # print(f"{feat_name}: {N}, {C}, {H}, {W}")
+        print(f"{feat_name}: {N}, {C}, {H}, {W}")
 
         if trun_flag:
             trun_feat = truncation(org_feat, trun_low, trun_high)
@@ -321,7 +321,8 @@ def nonlinear_fitting(org_feat_path, quant_mapping_path, model_type, task, sampl
             trun_feat = org_feat
 
         if task == 'csr':
-            trun_feat = trun_feat[:, :, :64, :]  # Crop features for 'csr' task
+            rand_idx = np.random.choice(trun_feat.shape[2], 64, replace=False)
+            trun_feat = trun_feat[:, :, rand_idx, :]  # Crop features for 'csr' task
         feat_list_all.append(trun_feat)
 
     feat_list_all = np.asarray(feat_list_all)
@@ -338,6 +339,59 @@ def nonlinear_fitting(org_feat_path, quant_mapping_path, model_type, task, sampl
         feat_list = feat_list_all
         process_fitting(feat_list, quant_mapping_path, task, bit_depth, trun_low, trun_high, samples, None)
 
+
+def nonlinear_fitting_get_feat(org_feat_path, quant_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, quant_type, bit_depth):
+    """
+    Combined function to handle quantization for different tasks based on task type.
+    
+    Parameters:
+        org_feat_path (str): Path to the original features.
+        quant_mapping_path (str): Path to save quantization mappings.
+        model_type (str): Model type.
+        task (str): Task name ('dpt', 'csr', etc.).
+        samples (int): Number of samples to process.
+        trun_flag (bool): Whether to apply truncation.
+        trun_high (float or List[float]): High truncation limit.
+        trun_low (float or List[float]): Low truncation limit.
+        quant_type (str): Quantization type.
+        bit_depth (int): Bit depth for quantization.
+    """
+    feat_names = sorted(os.listdir(org_feat_path))[:samples]
+    feat_list_all = []
+
+    # Load and preprocess features
+    for feat_name in feat_names:
+        org_feat_name = os.path.join(org_feat_path, feat_name)
+        org_feat = np.load(org_feat_name)
+        N, C, H, W = org_feat.shape
+        print(f"{feat_name}: {N}, {C}, {H}, {W}")
+
+        if trun_flag:
+            trun_feat = truncation(org_feat, trun_low, trun_high)
+        else:
+            trun_feat = org_feat
+
+        if task == 'csr':
+            rand_idx = np.random.choice(trun_feat.shape[2], 64, replace=False)
+            trun_feat = trun_feat[:, :, rand_idx, :]  # Crop features for 'csr' task
+        feat_list_all.append(trun_feat)
+
+    feat_list_all = np.asarray(feat_list_all)
+    # print(f"Loaded features shape: {feat_list_all.shape}")
+
+    # Task-specific processing
+    if task == 'dpt':
+        # Process each channel separately for 'dpt' task
+        for ch in range(feat_list_all.shape[2]):
+            feat_list = feat_list_all[:, :, ch, :, :]
+            # process_fitting(feat_list, quant_mapping_path, task, bit_depth, trun_low[ch], trun_high[ch], samples, ch)
+    else:
+        # Process all features together for other tasks
+        feat_list = feat_list_all
+        # process_fitting(feat_list, quant_mapping_path, task, bit_depth, trun_low, trun_high, samples, None)
+    return feat_list
+
+
 def process_fitting(feat_list, quant_mapping_path, task, bit_depth, trun_low, trun_high, samples, ch=None):
     """
     Helper function to process quantization for a given feature list.
@@ -352,22 +406,22 @@ def process_fitting(feat_list, quant_mapping_path, task, bit_depth, trun_low, tr
         samples (int): Number of samples.
         ch (int or None): Channel index for naming, if applicable.
     """
-    # Compute uniform quantization mapping
-    quant_time = time.time()
-    uniform_quant_feat = uniform_quantization(feat_list, trun_low, trun_high, bit_depth)
-    print(f'Uniform_quant_time: {(time.time()-quant_time):.4f}', end=' ')
-    uniform_dequant_feat = uniform_dequantization(uniform_quant_feat, trun_low, trun_high, bit_depth)
-    uniform_mse = np.mean((feat_list-uniform_dequant_feat)**2)
-    print(f"Uniform Feature MSE: {uniform_mse:.8f}")
+    # # Compute uniform quantization mapping
+    # quant_time = time.time()
+    # uniform_quant_feat = uniform_quantization(feat_list, trun_low, trun_high, bit_depth)
+    # print(f'Uniform_quant_time: {(time.time()-quant_time):.4f}', end=' ')
+    # uniform_dequant_feat = uniform_dequantization(uniform_quant_feat, trun_low, trun_high, bit_depth)
+    # uniform_mse = np.mean((feat_list-uniform_dequant_feat)**2)
+    # print(f"Uniform Feature MSE: {uniform_mse:.8f}")
 
-    # Compute density quantization mapping
-    quant_time = time.time()
-    density_points = density_fitting(feat_list, bit_depth)
-    print(f'Density_quant_time: {(time.time()-quant_time):.4f}', end=' ')
-    density_quant_feat = nonlinear_quantization(feat_list, density_points, bit_depth)
-    density_dequant_feat = nonlinear_dequantization(density_quant_feat, density_points, bit_depth)
-    density_mse = np.mean((feat_list-density_dequant_feat)**2)
-    print(f"Density Feature MSE: {density_mse:.8f}")
+    # # Compute density quantization mapping
+    # quant_time = time.time()
+    # density_points = density_fitting(feat_list, bit_depth)
+    # print(f'Density_quant_time: {(time.time()-quant_time):.4f}', end=' ')
+    # density_quant_feat = nonlinear_quantization(feat_list, density_points, bit_depth)
+    # density_dequant_feat = nonlinear_dequantization(density_quant_feat, density_points, bit_depth)
+    # density_mse = np.mean((feat_list-density_dequant_feat)**2)
+    # print(f"Density Feature MSE: {density_mse:.8f}")
 
     # Compute kmeans quantization mapping
     quant_time = time.time()
@@ -381,7 +435,7 @@ def process_fitting(feat_list, quant_mapping_path, task, bit_depth, trun_low, tr
     # Save quantization mapping
     suffix = f"_ch{ch}" if ch is not None else ""
     # save_quantization_points(density_points, f'{quant_mapping_path}/quantization_mapping_{task}{suffix}_trunl{trun_low}_trunh{trun_high}_density{samples}_bitdepth{bit_depth}.json')
-    # save_quantization_points(kmeans_points, f'{quant_mapping_path}/quantization_mapping_{task}{suffix}_trunl{trun_low}_trunh{trun_high}_kmeans{samples}_bitdepth{bit_depth}.json')
+    save_quantization_points(kmeans_points, f'{quant_mapping_path}/quantization_mapping_{task}{suffix}_trunl{trun_low}_trunh{trun_high}_kmeans{samples}_bitdepth{bit_depth}.json')
     
 def packing(feat, model_type):
     N, C, H, W = feat.shape
@@ -391,6 +445,16 @@ def packing(feat, model_type):
         feat = feat.transpose(0,2,1,3).reshape(N*H,C*W)
     elif model_type == 'sd3':
         feat = feat.reshape(int(C/4), int(C/4), H, W).transpose(0, 2, 1, 3).reshape(int(C/4*H), int(C/4*W)) 
+    return feat
+
+def unpacking(feat, shape, model_type):
+    N, C, H, W = shape
+    if model_type == 'llama3':
+        feat = np.expand_dims(feat, axis=0); feat = np.expand_dims(feat, axis=0)
+    elif model_type == 'dinov2':
+        feat = feat.reshape(N,H,C,W).transpose(0, 2, 1, 3) 
+    elif model_type == 'sd3':
+        feat = feat.reshape(int(C/4), H, int(C/4), W).transpose(0,2,1,3).reshape(N,C,H,W)
     return feat
 
 def random_crop(feat, crop_shape): # (hight, width)
@@ -413,89 +477,24 @@ def random_crop(feat, crop_shape): # (hight, width)
     
     return feat[start_row:end_row, start_col:end_col]
 
-def perform_nonlinear_quantization(org_feat_path, rec_feat_path, quant_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, quant_type, bit_depth, data_size):
-    """
-    Combined function to handle quantization for different tasks based on task type.
-    
-    Parameters:
-        org_feat_path (str): Path to the original features.
-        rec_feat_path (str): Path to save quantized features.
-        quant_mapping_path (str): Path to load quantization mappings.
-        model_type (str): Model type.
-        task (str): Task name ('dpt', 'csr', etc.).
-        samples (int): Number of samples to process.
-        trun_flag (bool): Whether to apply truncation.
-        trun_high (float or List[float]): High truncation limit.
-        trun_low (float or List[float]): Low truncation limit.
-        quant_type (str): Quantization type.
-        bit_depth (int): Bit depth for quantization.
-        data_size (int): Features to be quantized.
-    """
-    # get quantization points
-    if task == 'dpt':
-        quantization_mapping_name = []
-        for ch in range(4):
-            suffix = f"_ch{ch}"
-            quantization_mapping_name.append(f"{quant_mapping_path}/quantization_mapping_{task}{suffix}_{trun_flag}_trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}.json")
-    else:
-        quantization_mapping_name = f"{quant_mapping_path}/quantization_mapping_{task}_{trun_flag}_trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}.json"
-    
-    quantization_points = load_quantization_points(quantization_mapping_name)
-
-    feat_names = os.listdir(org_feat_path)[data_size:]
-    # Load and quantize features
-    for feat_name in feat_names:
-        org_feat_name = os.path.join(org_feat_path, feat_name)
-        org_feat = np.load(org_feat_name)
-        N, C, H, W = org_feat.shape
-        # print(f"{feat_name}: {N}, {C}, {H}, {W}")
-        rec_feat_name = os.path.join(rec_feat_path, feat_name)
-
-        if trun_flag:
-            trun_feat = truncation(org_feat, trun_low, trun_high)
-        else:
-            trun_feat = org_feat
-
-        quantized_feat = nonlinear_quantization(trun_feat, quantization_points, bit_depth)
-
-        pack_feat = packing(quantized_feat, model_type)
-        cropped_feat = random_crop(pack_feat, (256, 256))   # perform crop after packing
-
-        np.save(rec_feat_name, cropped_feat)
-
 
 if __name__ == "__main__":
-    # model_type = 'llama3'; task = 'csr'
-    # max_v = 47.75; min_v = -78; trun_high = 5; trun_low = -5
-
-    # model_type = 'dinov2'; task = 'cls'
-    # max_v = 104.1752; min_v = -552.4510; trun_high = 50; trun_low = -50
-
-    model_type = 'dinov2'; task = 'seg'
-    max_v = 103.2168; min_v = -530.9767; trun_high = 50; trun_low = -50
-
-    # model_type = 'dinov2'; task = 'dpt'
-    # max_v = [3.2777, 5.0291, 25.0456, 102.0307]; min_v = [-2.4246, -26.8908, -323.2952, -504.4310]; trun_high = [1, 2, 10, 20]; trun_low = [-1, -2, -10, -20]
+    # model_type = 'dinov2'; task = 'seg'
+    # max_v = 105.95; min_v = -506.97; trun_high = 0; trun_low = 0
     
-    # model_type = 'sd3'; task = 'tti'
-    # max_v = 3.0527; min_v = -4.0938; trun_high = 3.0527; trun_low = -4.0938 
+    model_type = 'sd3'; task = 'tti'
+    max_v = 4.46; min_v = -5.79; trun_high = 4.46; trun_low = -5.79
 
     samples = 10; quant_type = 'kmeans'; bit_depth = 8
 
-    org_feat_path = f'/gdata1/gaocs/FCM_LM_Train_Data/{model_type}/{task}/org_feat/train'
+    org_feat_path = f'/gdata1/gaocs/FCM_LM_Train_Data/{model_type}/{task}/org_feat'
     quant_mapping_path = f'/gdata1/gaocs/Data_FCM_NQ/{model_type}/{task}/quantization_mapping'
     
-    bit_depths = [8]
+    bit_depths = [8, 10, 6]
 
     for bit_depth in bit_depths:       
         trun_flag = False
-        if trun_flag == False: trun_high = max_v; trun_low = min_v
+        if trun_flag == False: trun_high = 0; trun_low = 0
         print(model_type, task, trun_flag, quant_type, samples, max_v, min_v, trun_high, trun_low, bit_depth)
         # generate quantization points
-        # nonlinear_fitting(org_feat_path, quant_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, quant_type, bit_depth)
-
-        # perform quantization and save quantized features
-        rec_feat_path = f'/gdata1/gaocs/FCM_LM_Train_Data/{model_type}/{task}/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/crop_hgt256_wdt256/train'
-        if not os.path.exists(rec_feat_path): os.makedirs(rec_feat_path)
-        data_size = 5000
-        perform_nonlinear_quantization(org_feat_path, rec_feat_path, quant_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, quant_type, bit_depth, data_size)
+        nonlinear_fitting(org_feat_path, quant_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, quant_type, bit_depth)

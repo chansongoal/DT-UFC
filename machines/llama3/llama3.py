@@ -5,7 +5,8 @@ import torch
 from transformers import pipeline
 # from ARC import ARCDataset
 import numpy as np
-from datasets import Dataset
+# from datasets import Dataset
+import argparse
 
 class ARCDataset:
     @staticmethod
@@ -86,7 +87,7 @@ class ARCChallengeSolver:
             device_map="auto",
         )
 
-    def generate_predictions(self):
+    def generate_predictions(self, rec_feat_path=None):
         self.all_results = []
 
         correct_prompts = []
@@ -94,7 +95,7 @@ class ARCChallengeSolver:
 
         for i in range(len(self.inputs)):
             with open(self.temp_id_file, 'w') as file:
-                file.write(f"{self.ids[i]}\n")
+                file.write(f"{rec_feat_path}/{self.ids[i]}\n")
             prompt = self.inputs[i]
             result = self.pipeline(
                 prompt,
@@ -102,9 +103,9 @@ class ARCChallengeSolver:
                 return_full_text=0,
                 do_sample=False # guarantee the output is the same 
             )
-            print(self.ids[i])
-            print(f"prompt: {prompt}\n")
-            print(f"prediction: {result}\n")
+            # print(self.ids[i])
+            # print(f"prompt: {prompt}")
+            # print(f"prediction: {result}")
             result_dict = {
                 "prompt": prompt,
                 "answer": result
@@ -159,11 +160,75 @@ class ARCChallengeSolver:
         accuracy = self.calculate_accuracy()
         print(f"Accuracy: {accuracy*100:.4f}")
 
-if __name__ == "__main__":
+    def llama_initilize(self):
+        self.load_data()
+        self.prepare_inputs()
+        self.initialize_pipeline()
+
+    def llama_inference(self, rec_feat_path):
+        self.generate_predictions(rec_feat_path)
+        # self.save_results()
+        accuracy = self.calculate_accuracy()
+        print(f"Accuracy: {accuracy*100:.4f}")
+
+
+def compressai_evaluation(arch, trun_low, trun_high, quant_type, samples, bit_depth, train_task, lambda_value_all, epochs, learning_rate, batch_size, patch_size):
+    # Set up paths
     model_path = "/gdata2/gaocs/pretrained_models/llama/Meta-Llama-3-8B-Instruct"
-    org_json_path = "/gdata1/gaocs/Data_FCM_NQ/llama3/csr/source/arc_challenge_sampled_longest500.jsonl"
+    org_json_path = "/gdata1/gaocs/FCM_LM_Test_Dataset/llama3/csr/source/arc_challenge_sampled_longest500.jsonl"
     result_json_path = 'result.json'
-    temp_id_file = "/gdata1/gaocs/Data_FCM_NQ/llama3/csr/source/temp_id.txt"
+    temp_id_file = "/ghome/gaocs/FCM-NQ/machines/llama3/temp_id.txt"
 
     solver = ARCChallengeSolver(model_path, org_json_path, result_json_path, temp_id_file)
-    solver.llama_pipeline()
+    solver.llama_initilize()
+
+    root_path = f'/gdata1/gaocs/Data_FCM_NQ/llama3/csr/{arch}'; print('root_path: ', root_path)
+    
+    # Evaluate and print results
+    for lambda_value in lambda_value_all:
+        print(arch, trun_low, trun_high, quant_type, samples, bit_depth, lambda_value, epochs, learning_rate, batch_size, patch_size)
+        if train_task == 'csr':
+            rec_feature_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/" \
+                            f"lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size}"
+        else:
+            rec_feature_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/" \
+                            f"trained_{train_task}_lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size}"
+        print(rec_feature_path)
+        solver.llama_inference(rec_feature_path)
+
+
+def argument_parsing():
+    parser = argparse.ArgumentParser(description="Train Evaluation Pipeline")
+    parser.add_argument('--arch', type=str, default='bmshj2018-hyperprior', help='arch')
+    parser.add_argument('--trun_low', type=float, default=-506.97, help='trun_low')
+    parser.add_argument('--trun_high', type=float, default=105.95, help='trun_high')
+    parser.add_argument('--quant_type', type=str, default='kmeans', help='quant_type')
+    parser.add_argument('--samples', type=int, default=10, help='samples')
+    parser.add_argument('--bit_depth', type=int, default=8, help='bit_depth')
+    parser.add_argument('--train_task', type=str, default='seg', help='train_task')
+    parser.add_argument('--lambda_value_all', nargs='+', type=float, help='lambda_value_all')
+    parser.add_argument('--epochs', type=int, default=200, help='epochs')
+    parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning_rate')
+    parser.add_argument('--batch_size', type=int, default=16, help='batch_size')
+    parser.add_argument('--patch_size', type=str, default='64-1024', help='patch_size')
+    
+    args = parser.parse_args()
+    
+    return args
+
+if __name__ == "__main__":
+    args = argument_parsing()
+    arch = args.arch
+    trun_low = args.trun_low
+    trun_high = args.trun_high
+    quant_type = args.quant_type
+    samples = args.samples
+    bit_depth = args.bit_depth
+    train_task = args.train_task
+    lambda_value_all = args.lambda_value_all
+    epochs = args.epochs
+    learning_rate = args.learning_rate
+    batch_size = args.batch_size
+    patch_size = args.patch_size
+
+    compressai_evaluation(arch, trun_low, trun_high, quant_type, samples, bit_depth, train_task, lambda_value_all, epochs, learning_rate, batch_size, patch_size)

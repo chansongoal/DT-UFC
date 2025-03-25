@@ -8,6 +8,7 @@ import itertools
 from tqdm import tqdm
 from functools import partial
 from PIL import Image
+import argparse
 
 import torch
 import torch.nn.functional as F
@@ -500,7 +501,7 @@ def seg_pipeline(config_path: str, backbone_checkpoint_path: str, head_checkpoin
     # print(f"\nmIoU: {all_miou*100:.4f}")
     # print(f"Feature MSE: {np.mean(mse_list):.8f}")
 
-def vtm_baseline_evaluation():
+def vtm_evaluation():
     # Set up paths
     config_path = 'cfg/dinov2_vitg14_voc2012_linear_config.py'
     backbone_checkpoint_path = '/home/gaocs/models/dinov2/dinov2_vitg14_pretrain.pth'
@@ -541,16 +542,16 @@ def vtm_baseline_evaluation():
         print(f"\nmIoU: {all_miou*100:.4f}")
         print(f"Feature MSE: {np.mean(mse_list):.8f}")
 
-def hyperprior_baseline_evaluation():
+def quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file):
     # Set up paths
     config_path = 'cfg/dinov2_vitg14_voc2012_linear_config.py'
     backbone_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_pretrain.pth'
     head_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_voc2012_linear_head.pth'
     
     source_img_path = '/gdata/gaocs/dataset/VOC2012'
-    source_split_name = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/source/val_20.txt'
-    org_feature_path = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/feature_test'
-    root_path = f'/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/hyperprior'; print('root_path: ', root_path)
+    source_split_name = f'/gdata1/gaocs/FCM_LM_Test_Dataset/dinov2/seg/source/{source_file}'
+    org_feature_path = '/gdata1/gaocs/FCM_LM_Test_Dataset/dinov2/seg/feature'
+    root_path = f'/gdata1/gaocs/Data_FCM_NQ/dinov2/seg'; print('root_path: ', root_path)
     
     # Load configuration
     cfg = mmcv.Config.fromfile(config_path)
@@ -565,41 +566,105 @@ def hyperprior_baseline_evaluation():
     model = build_segmentation_model(cfg, backbone_model, head_checkpoint_path)
     
     # Evaluate and print results
-    max_v = 103.2168; min_v = -530.9767; trun_high = 5; trun_low = -5
-    # lambda_value_all = [0.0005, 0.001, 0.003, 0.007, 0.015]
-    lambda_value_all = [0.003]
-    epochs = 800; learning_rate = "0.0001"; batch_size = 128; patch_size = "256 256"   # height first, width later
-    trun_flag = False
-    samples = 10; bit_depth = 8; quant_type = 'kmeans'
+    bit_depth_all = [10, 8]
 
-    if trun_flag == False: trun_high = max_v; trun_low = min_v
-    for lambda_value in lambda_value_all:
-        print(trun_low, trun_high, quant_type, samples, bit_depth)
-        print(lambda_value, epochs, learning_rate, batch_size, patch_size)
+    for bit_depth in bit_depth_all:
+        print(source_file, trun_low, trun_high, quant_type, samples, bit_depth)
         
-        rec_feature_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/lambda{lambda_value}_epoch{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}"
+        rec_feature_path = f"{root_path}/quantization/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}/bitdepth{bit_depth}"
 
         all_iou, all_miou, mse_list = seg_evaluate(model, source_img_path, org_feature_path, rec_feature_path, image_list, backbone_model)
         # print(f"IoU: ", end=" ")
         # for iou in all_iou: print(f"{iou*100:.4f}", end=" ") 
-        print(f"\nmIoU: {all_miou*100:.4f}")
-        print(f"Feature MSE: {np.mean(mse_list):.8f}")
+        print(f"mIoU: {all_miou*100:.4f}")
+        print(f"Feature MSE: {np.mean(mse_list):.8f}\n")
 
-# run below to evaluate the reconstructed features
-if __name__ == "__main__":
-    # vtm_baseline_evaluation()
-    hyperprior_baseline_evaluation()
-
-# # run below to extract original features as the dataset. 
-# # You can skip feature extraction if you have download the test dataset from https://drive.google.com/drive/folders/1RZFGlBd6wZr4emuGO4_YJWfKPtAwcMXQ
-# if __name__ == "__main__":
-#     config_path = f"cfg/dinov2_vitg14_voc2012_linear_config.py"
-#     backbone_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_pretrain.pth'
-#     head_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_voc2012_linear_head.pth'
+def compressai_evaluation(arch, trun_low, trun_high, quant_type, samples, bit_depth, train_task, lambda_value_all, epochs, learning_rate, batch_size, patch_size):
+    # Set up paths
+    config_path = 'cfg/dinov2_vitg14_voc2012_linear_config.py'
+    backbone_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_pretrain.pth'
+    head_checkpoint_path = '/gdata/gaocs/pretrained_models/dinov2/dinov2_vitg14_voc2012_linear_head.pth'
     
-#     source_img_path = '/gdata/gaocs/dataset/VOC2012'
-#     source_split_name = '/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/source/seg_voc_train.txt'
-#     org_feature_path = '/gdata1/gaocs/FCM_LM_Train_Data/dinov2/seg/org_size'
-#     rec_feature_path = '/gdata1/gaocs/FCM_LM_Train_Data/dinov2/seg/org_size'
+    source_img_path = '/gdata/gaocs/dataset/VOC2012'
+    source_split_name = '/gdata1/gaocs/FCM_LM_Test_Dataset/dinov2/seg/source/seg_val_100.txt'
+    org_feature_path = '/gdata1/gaocs/FCM_LM_Test_Dataset/dinov2/seg/feature'
+    root_path = f'/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/{arch}'; print('root_path: ', root_path)
+    
+    # Load configuration
+    cfg = mmcv.Config.fromfile(config_path)
+    
+    # Setup source image list
+    with open(source_split_name) as f:
+        image_list = f.readlines()
+        image_list = ''.join(image_list).strip('\n').splitlines()
 
-#     seg_pipeline(config_path, backbone_checkpoint_path, head_checkpoint_path, source_img_path, source_split_name, org_feature_path, rec_feature_path)
+    # Setup models
+    backbone_model = setup_backbone(backbone_checkpoint_path)
+    model = build_segmentation_model(cfg, backbone_model, head_checkpoint_path)
+    
+    # Evaluate and print results
+    for lambda_value in lambda_value_all:
+        print(arch, trun_low, trun_high, quant_type, samples, bit_depth, lambda_value, epochs, learning_rate, batch_size, patch_size)
+        
+        if train_task == 'seg':
+            rec_feature_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/" \
+                               f"lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}"
+        else:
+            rec_feature_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/" \
+                               f"trained_{train_task}_lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}"
+        all_iou, all_miou, mse_list = seg_evaluate(model, source_img_path, org_feature_path, rec_feature_path, image_list, backbone_model)
+        # print(f"IoU: ", end=" ")
+        # for iou in all_iou: print(f"{iou*100:.4f}", end=" ") 
+        print(f"mIoU: {all_miou*100:.4f}")
+        print(f"Feature MSE: {np.mean(mse_list):.8f}\n")
+
+def argument_parsing():
+    parser = argparse.ArgumentParser(description="Train Evaluation Pipeline")
+    parser.add_argument('--arch', type=str, default='bmshj2018-hyperprior', help='arch')
+    parser.add_argument('--trun_low', type=float, default=-506.97, help='trun_low')
+    parser.add_argument('--trun_high', type=float, default=105.95, help='trun_high')
+    parser.add_argument('--quant_type', type=str, default='kmeans', help='quant_type')
+    parser.add_argument('--samples', type=int, default=10, help='samples')
+    parser.add_argument('--bit_depth', type=int, default=8, help='bit_depth')
+    parser.add_argument('--train_task', type=str, default='seg', help='train_task')
+    parser.add_argument('--lambda_value_all', nargs='+', type=float, help='lambda_value_all')
+    parser.add_argument('--epochs', type=int, default=200, help='epochs')
+    parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning_rate')
+    parser.add_argument('--batch_size', type=int, default=16, help='batch_size')
+    parser.add_argument('--patch_size', type=str, default='256-256', help='patch_size')
+    
+    args = parser.parse_args()
+    
+    return args
+
+
+if __name__ == "__main__":
+    args = argument_parsing()
+    arch = args.arch
+    trun_low = args.trun_low
+    trun_high = args.trun_high
+    quant_type = args.quant_type
+    samples = args.samples
+    bit_depth = args.bit_depth
+    train_task = args.train_task
+    lambda_value_all = args.lambda_value_all
+    epochs = args.epochs
+    learning_rate = args.learning_rate
+    batch_size = args.batch_size
+    patch_size = args.patch_size
+    
+    compressai_evaluation(arch, trun_low, trun_high, quant_type, samples, bit_depth, train_task, lambda_value_all, epochs, learning_rate, batch_size, patch_size)
+
+    # # for quantization evaluation
+    # trun_high = 105.95; trun_low = -506.97
+    # source_file = 'seg_val_20.txt'
+    # quant_type = 'kmeans'; samples = 10
+    # quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file)
+    # quant_type = 'uniform'; samples = 0
+    # quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file)
+    # source_file = 'seg_val_100.txt'
+    # quant_type = 'kmeans'; samples = 10
+    # quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file)
+    # quant_type = 'uniform'; samples = 0
+    # quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file)
+

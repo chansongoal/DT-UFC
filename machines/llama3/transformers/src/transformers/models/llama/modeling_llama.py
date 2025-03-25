@@ -888,7 +888,7 @@ class LlamaModel(LlamaPreTrainedModel):
                 
             #gcs, save or load features here
             if layer_idx == 32:
-                temp_id_file = "/gdata1/gaocs/Data_FCM_NQ/llama3/csr/source/temp_id.txt"
+                temp_id_file = "/ghome/gaocs/FCM-NQ/machines/llama3/temp_id.txt"
                 with open(temp_id_file, 'r') as file:
                     id = file.read().strip()
                     # print('layer_idx, id:', layer_idx, id)
@@ -898,9 +898,9 @@ class LlamaModel(LlamaPreTrainedModel):
                 # feature = layer_outputs[0]
                 # feature = feature.unsqueeze(0)
                 # feature_np = feature.detach().to(torch.float).cpu().numpy()
-                # save_path = '/gdata1/gaocs/Data_FCM_NQ/llama3/csr/feature_test_3090'
-                # feat_name_org = os.path.join(save_path, id+'.npy')
-                # # feat_name_org = os.path.join(save_path,'arc_'+id+'.npy')
+                # save_path = '/gdata1/gaocs/FCM_LM_Train_Data/llama3/csr/org_feat'
+                # # feat_name_org = os.path.join(save_path, id+'.npy')
+                # feat_name_org = os.path.join(save_path,'open_'+id+'.npy')
                 # np.save(feat_name_org, feature_np)
 
                 # only truncation
@@ -915,8 +915,8 @@ class LlamaModel(LlamaPreTrainedModel):
                 # hidden_states = dequant_feat
 
                 # load reconstructed features from disk
-                rec_path = '/gdata1/gaocs/Data_FCM_NQ/llama3/csr/feature_test_all'
-                feature_name_rec = os.path.join(rec_path,id+'.npy')
+                # rec_path = '/gdata1/gaocs/Data_FCM_NQ/llama3/csr/hyperprior/decoded/trunl-71.5_trunh47.75_kmeans10_bitdepth8/trained_seg_lambda0.003_epochs200_lr0.0001_bs128_patch256-256'
+                feature_name_rec = os.path.join(id+'.npy')
                 # print(feature_name_rec)
                 feature_rec = np.load(feature_name_rec)
                 feature_rec = np.squeeze(feature_rec, axis=0)

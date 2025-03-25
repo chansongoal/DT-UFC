@@ -10,5 +10,12 @@ echo This job runs on following nodes and gpus:
 cat $PBS_NODEFILE
 cat $PBS_GPUFILE
 
+# -s "/ghome/gaocs/FCM-NQ/job/sd3_tti.sh hyperprior -5.79 4.46 kmeans 10 8 seg 0.0001 200 128 0.00055 0.001 0.003 0.004 0.005 0.007" \
+# -s "/ghome/gaocs/FCM-NQ/job/sd3_tti.sh hyperprior -5.79 4.46 kmeans 10 8 csr 0.0001 400 128 64-1024 0.0005 0.0008 0.0015 0.002 0.0025 0.003 0.004" \
+# -s "/ghome/gaocs/FCM-NQ/job/sd3_tti.sh hyperprior -5.79 4.46 kmeans 10 8 tti 0.0001 600 32 512-512 0.001 0.002 0.004 0.006 0.008 0.01 0.015 0.02 0.05" \
 
-startdocker -u " -v /gdata/gaocs:/gdata/gaocs -v /gdata/liuzj:/gdata/liuzj -v /gdata1/gaocs:/gdata1/gaocs -v /gdata2/gaocs:/gdata2/gaocs " -P /ghome/gaocs  -s "/ghome/gaocs/FCM-NQ/job/sd3_tti.sh"     bit:5000/gaocs_sd3:diffusers_pytorch_cuda_latest
+startdocker -u " -v /gdata/gaocs:/gdata/gaocs -v /gdata/liuzj:/gdata/liuzj -v /gdata1/gaocs:/gdata1/gaocs -v /gdata2/gaocs:/gdata2/gaocs " \
+                -P /ghome/gaocs  \
+                -s "/ghome/gaocs/FCM-NQ/job/sd3_tti.sh elic -5.79 4.46 kmeans 10 8 tti 0.0001 600 12 512-512 0.0002 0.0005 0.0007 0.001 0.003 0.005 0.006 0.01 0.02" \
+                bit:5000/gaocs_sd3:diffusers_pytorch_cuda_latest
+

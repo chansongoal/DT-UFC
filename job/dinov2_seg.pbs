@@ -1,7 +1,7 @@
-#PBS -N dinov2_seg2
-#PBS -o /ghome/gaocs/FCM-NQ/err_out/dinov2_seg2.out
-#PBS -e /ghome/gaocs/FCM-NQ/err_out/dinov2_seg2.err
-#PBS -l nodes=1:gpus=1:s,walltime=350:00:00
+#PBS -N seg_eval_elic
+#PBS -o /ghome/gaocs/FCM-NQ/err_out/seg_eval_elic.out
+#PBS -e /ghome/gaocs/FCM-NQ/err_out/seg_eval_elic.err
+#PBS -l nodes=1:gpus=1:A,walltime=350:00:00
 #PBS -r y
 cd $PBS_O_WORKDIR
 echo Time is `date`
@@ -10,5 +10,12 @@ echo This job runs on following nodes and gpus:
 cat $PBS_NODEFILE
 cat $PBS_GPUFILE
 
-startdocker -u " -v /gdata/gaocs:/gdata/gaocs  -v /gdata1/gaocs:/gdata1/gaocs -v /gdata2/gaocs:/gdata2/gaocs " -P /ghome/gaocs  -s "/ghome/gaocs/FCM-NQ/job/dinov2_seg.sh"     bit:5000/liuzj_dinov2:v1
+# -s "/ghome/gaocs/FCM-NQ/job/dinov2_seg.sh elic -506.97 105.95 kmeans 10 8 seg 0.0001 200 64 256-256 1e-05 5e-05 7e-05 0.0001 0.0002 0.0003 0.0004 0.0005 0.0006 0.0007 0.0008 0.001 0.002 0.003 0.004 0.005 0.007 0.01" \
+# -s "/ghome/gaocs/FCM-NQ/job/dinov2_seg.sh hyperprior -506.97 105.95 uniform 0 1 seg 0.0001 200 128 256-256 1.0 1.5 2.0 3.0 5.0 10.0 20.0" \
+# -s "/ghome/gaocs/FCM-NQ/job/dinov2_seg.sh hyperprior -506.97 105.95 kmeans 10 8 seg 0.0001 200 128 256-256 0.0003 0.00035 0.0004 0.00045 0.00048 0.00049 0.0005 0.00055 0.0006 0.0007 0.0008 0.001 0.0015 0.002 0.0025 0.003 0.004 0.005 0.006 0.007 0.01 0.015" \
+
+startdocker -u " -v /gdata/gaocs:/gdata/gaocs  -v /gdata1/gaocs:/gdata1/gaocs -v /gdata2/gaocs:/gdata2/gaocs " \
+            -P /ghome/gaocs \
+            -s "/ghome/gaocs/FCM-NQ/job/dinov2_seg.sh elic -506.97 105.95 kmeans 10 8 seg 0.0001 200 64 256-256 0.00058 0.0007 0.002 0.003 0.004 0.005 0.007 0.01" \
+            bit:5000/liuzj_dinov2:v1
 

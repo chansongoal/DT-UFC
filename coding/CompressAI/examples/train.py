@@ -110,14 +110,14 @@ def train_one_epoch(
         aux_loss.backward()
         aux_optimizer.step()
 
-        if i % 10 == 0:
+        if i % 100 == 0:
             print(
                 f"Train epoch {epoch}: ["
                 f"{i*len(d)}/{len(train_dataloader.dataset)}"
                 f" ({100. * i / len(train_dataloader):.0f}%)]"
-                f'\tLoss: {out_criterion["loss"].item():.3f} |'
+                f'\tLoss: {out_criterion["loss"].item():.7f} |'
                 f'\tMSE loss: {out_criterion["mse_loss"].item():.7f} |'
-                f'\tBpp loss: {out_criterion["bpp_loss"].item():.4f} |'
+                f'\tBpp loss: {out_criterion["bpp_loss"].item():.7f} |'
                 f"\tAux loss: {aux_loss.item():.2f}"
             )
 
@@ -144,10 +144,10 @@ def test_epoch(epoch, test_dataloader, model, criterion):
 
     print(
         f"Test epoch {epoch}: Average losses:"
-        f"\tLoss: {loss.avg:.3f} |"
+        f"\tLoss: {loss.avg:.7f} |"
         f"\tMSE loss: {mse_loss.avg:.7f} |"
-        f"\tBpp loss: {bpp_loss.avg:.4f} |"
-        f"\tAux loss: {aux_loss.avg:.2f}\n"
+        f"\tBpp loss: {bpp_loss.avg:.7f} |"
+        f"\tAux loss: {aux_loss.avg:.4f}\n"
     )
 
     return loss.avg
@@ -193,9 +193,17 @@ def parse_args(argv):
     parser.add_argument(
         "-trun_flag",
         "--trun_flag",
-        type=bool,
-        default=True,
+        type=str,
+        default='False',
         help="Please input the trun_flag.",
+    )
+    # lzj
+    parser.add_argument(
+        "-Prepro_flag",
+        "--Prepro_flag",
+        type=int,
+        default=1,
+        help="Please input the Prepro_flag.",
     )
     parser.add_argument(
         "-trun_low",
@@ -327,19 +335,11 @@ def main(argv):
         torch.manual_seed(args.seed)
         random.seed(args.seed)
 
-    #gcs
-    train_transforms = transforms.Compose(
-        [transforms.ToTensor()]
-)
-
-    test_transforms = transforms.Compose(
-        [transforms.ToTensor()]
-    )
-
     #gcs 
-    train_dataset = FeatureFolder(args.dataset, split="train", transform=train_transforms, model_type=args.model_type, task=args.task, trun_flag=args.trun_flag, trun_low=args.trun_low, trun_high=args.trun_high, quant_type=args.quant_type, qsamples=args.qsamples, bit_depth=args.bit_depth, quant_points_name=args.quant_points_name, patch_size=args.patch_size)
-    test_dataset = FeatureFolder(args.dataset, split="test", transform=test_transforms, model_type=args.model_type, task=args.task, trun_flag=args.trun_flag, trun_low=args.trun_low, trun_high=args.trun_high, quant_type=args.quant_type, qsamples=args.qsamples, bit_depth=args.bit_depth, quant_points_name=args.quant_points_name, patch_size=args.patch_size)
-    print(f"model_type={args.model_type}, task={args.task}, trun_flag={args.trun_flag}, trun_low={args.trun_low}, trun_high={args.trun_high}, quant_type={args.quant_type}, qsamples={args.qsamples}, bit_depth={args.bit_depth}, quant_points_name={args.quant_points_name}, patch_size={args.patch_size}")
+    train_dataset = FeatureFolder(args.dataset, split="train")
+    test_dataset = FeatureFolder(args.dataset, split="test")
+    
+    print(f"model_type={args.model_type}, task={args.task}, trun_flag={args.trun_flag}, trun_low={args.trun_low}, trun_high={args.trun_high}, quant_type={args.quant_type}, qsamples={args.qsamples}, bit_depth={args.bit_depth}, quant_points_name={args.quant_points_name}, patch_size={args.patch_size}, Prepro_flag={args.Prepro_flag}")
     device = "cuda" if args.cuda and torch.cuda.is_available() else "cpu"
 
     train_dataloader = DataLoader(
@@ -369,14 +369,16 @@ def main(argv):
     criterion = RateDistortionLoss(lmbda=args.lmbda)
 
     last_epoch = 0
-    if args.checkpoint:  # load from previous checkpoint
+    if args.checkpoint and args.checkpoint != 'None':  # load from previous checkpoint
         print("Loading", args.checkpoint)
         checkpoint = torch.load(args.checkpoint, map_location=device)
         last_epoch = checkpoint["epoch"] + 1
-        net.load_state_dict(checkpoint["state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer"])
-        aux_optimizer.load_state_dict(checkpoint["aux_optimizer"])
-        lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+        net.load_state_dict(checkpoint["state_dict"]); print('Load state dict')
+        # optimizer.load_state_dict(checkpoint["optimizer"]); print('Load optimizer')
+        # aux_optimizer.load_state_dict(checkpoint["aux_optimizer"]); print('Load aux_optimizer')
+        # lr_scheduler.load_state_dict(checkpoint["lr_scheduler"]); print('Load lr_scheduler')
+        # # gcs, init learning rate
+        # optimizer.param_groups[0]['lr'] = args.learning_rate
 
     best_loss = float("inf")
     for epoch in range(last_epoch, args.epochs):
@@ -393,7 +395,7 @@ def main(argv):
         loss = test_epoch(epoch, test_dataloader, net, criterion)
         lr_scheduler.step(loss)
 
-        is_best = loss < best_loss
+        is_best = loss < best_loss  # is this reasonable? what if MSE cannot measure semantic distortion?!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         best_loss = min(loss, best_loss)
 
         #gcs
@@ -417,7 +419,7 @@ def main(argv):
                     #gcs
                     args.savepath,
                 )
-            elif (epoch % args.save_period == (args.save_period-1) or epoch == args.epochs - 1):
+            if (epoch % args.save_period == (args.save_period-1) or epoch == args.epochs - 1):
                 checkpoint_name = f"{args.savepath[:-8]}_epoch{epoch}.pth.tar"
                 save_checkpoint(
                     {

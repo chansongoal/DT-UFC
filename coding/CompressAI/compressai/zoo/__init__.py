@@ -27,6 +27,7 @@
 # OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+# lzj
 from .image import (
     bmshj2018_factorized,
     bmshj2018_factorized_relu,
@@ -35,11 +36,13 @@ from .image import (
     cheng2020_attn,
     mbt2018,
     mbt2018_mean,
+    elic2022_official,
 )
 from .image_vbr import bmshj2018_hyperprior_vbr, mbt2018_mean_vbr, mbt2018_vbr
 from .pretrained import load_pretrained as load_state_dict
 from .video import ssf2020
 
+# lzj
 image_models = {
     "bmshj2018-factorized": bmshj2018_factorized,
     "bmshj2018-factorized-relu": bmshj2018_factorized_relu,
@@ -51,6 +54,7 @@ image_models = {
     "bmshj2018-hyperprior-vbr": bmshj2018_hyperprior_vbr,
     "mbt2018-mean-vbr": mbt2018_mean_vbr,
     "mbt2018-vbr": mbt2018_vbr,
+    "elic2022-official": elic2022_official,
 }
 
 # Not yet available.
