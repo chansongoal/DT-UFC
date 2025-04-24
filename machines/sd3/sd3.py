@@ -215,16 +215,14 @@ def tti_pipeline(source_captions_name, org_feature_path, org_image_path, rec_fea
     # clip_score_fn = partial(clip_score, model_name_or_path=vae_checkpoint_path)
     # tti_evaluate_clip_score(sd3_pipeline, clip_score_fn, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
     
-def quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file):
+def transform_evaluation(transform_type, samples, bit_depth):
     # Setup related path
-    dataset_root = '/gdata1/gaocs/FCM_LM_Test_Dataset/sd3/tti'
-    source_captions_name = f"{dataset_root}/source/{source_file}"
     sd3_checkpoint_path = "/gdata/liuzj/Data/sd3/tti/pretrained_head/stable-diffusion-3-medium-diffusers"
-
-    org_feature_path = f'{dataset_root}/feature'
-    org_image_path = f'{dataset_root}/image'  # use the images generated from original features as the anchor
-
-    root_path = f'/gdata1/gaocs/Data_FCM_NQ/sd3/tti'; print('root_path: ', root_path)
+    test_data_root = '/gdata1/gaocs/FCM_LM_Test_Dataset/sd3/tti'
+    source_captions_name = f"{test_data_root}/source/captions_val2017_select500.txt"
+    org_feature_path = f'{test_data_root}/feature'
+    org_image_path = f'{test_data_root}/image'  # use the images generated from original features as the anchor
+    root_path = f'/gdata1/gaocs/Data_DTUFC/inverse_transformed'; print('root_path: ', root_path)
 
     # Obtain source captions
     source_captions, image_names = get_captions(source_captions_name)
@@ -234,30 +232,26 @@ def quantization_evaluation(trun_low, trun_high, quant_type, samples, source_fil
     sd3_pipeline.enable_model_cpu_offload()
 
     # Evaluate and print results
-    bit_depth_all = [10, 8]
+    print(source_captions_name) 
+    print(transform_type, samples, bit_depth)
+    rec_feature_path = f"{root_path}/sd3_tti/{transform_type}{samples}_bitdepth{bit_depth}"
+    rec_image_path = f"{rec_feature_path}_image"
 
-    for bit_depth in bit_depth_all:
-        print(source_file, trun_low, trun_high, quant_type, samples, bit_depth)
-        rec_feature_path = f"{root_path}/quantization/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}/bitdepth{bit_depth}"
-        rec_image_path = f"{rec_feature_path}_image"
+    # Generate images 
+    os.makedirs(rec_image_path, exist_ok=True)
+    feat_to_image(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
+    
+    # Evaluation
+    tti_evaluate_fid(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, org_image_path, rec_image_path)
 
-        # Generate images 
-        os.makedirs(rec_image_path, exist_ok=True)
-        feat_to_image(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, rec_image_path)
-        
-        # Evaluation
-        tti_evaluate_fid(sd3_pipeline, source_captions, image_names, org_feature_path, rec_feature_path, org_image_path, rec_image_path)
-
-def compressai_evaluation(arch, trun_low, trun_high, quant_type, samples, bit_depth, train_task, lambda_value_all, epochs, learning_rate, batch_size, patch_size):
+def compressai_evaluation(arch, train_task, transform_type, samples, bit_depth, lambda_value_all, epochs, learning_rate, batch_size, patch_size):
     # Setup related path
-    dataset_root = '/gdata1/gaocs/FCM_LM_Test_Dataset/sd3/tti'
-    source_captions_name = f"{dataset_root}/source/captions_val2017_select500.txt"
     sd3_checkpoint_path = "/gdata/liuzj/Data/sd3/tti/pretrained_head/stable-diffusion-3-medium-diffusers"
-
-    org_feature_path = f'{dataset_root}/feature'
-    org_image_path = f'{dataset_root}/image'  # use the images generated from original features as the anchor
-
-    root_path = f'/gdata1/gaocs/Data_FCM_NQ/sd3/tti/{arch}'; print('root_path: ', root_path)
+    test_data_root = '/gdata1/gaocs/FCM_LM_Test_Dataset/sd3/tti'
+    source_captions_name = f"{test_data_root}/source/captions_val2017_select500.txt"
+    org_feature_path = f'{test_data_root}/feature'
+    org_image_path = f'{test_data_root}/image'  # use the images generated from original features as the anchor
+    root_path = f'/gdata1/gaocs/Data_DTUFC/decoded'; print('root_path: ', root_path)
 
     # Obtain source captions
     source_captions, image_names = get_captions(source_captions_name)
@@ -266,14 +260,43 @@ def compressai_evaluation(arch, trun_low, trun_high, quant_type, samples, bit_de
     sd3_pipeline = StableDiffusion3Pipeline.from_pretrained(sd3_checkpoint_path, torch_dtype=torch.float16)
     sd3_pipeline.enable_model_cpu_offload()
 
-    for lambda_value in lambda_value_all:
-        print(arch, trun_low, trun_high, quant_type, samples, bit_depth, lambda_value, epochs, learning_rate, batch_size, patch_size)
-        if train_task == 'tti':
-            rec_feature_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/" \
-                           f"lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size}"
-        else:
-            rec_feature_path = f"{root_path}/decoded/trunl{trun_low}_trunh{trun_high}_{quant_type}{samples}_bitdepth{bit_depth}/" \
-                            f"trained_{train_task}_lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size}"
+    if arch == 'hyperprior':
+        if train_task == 'csr':
+            lambda_value_all = [0.0005, 0.0008, 0.0017, 0.0019, 0.002, 0.0025, 0.003, 0.0035, 0.006]
+            epochs_all = [400, 400, 400, 400, 400, 400, 400, 400, 400]; 
+            batch_size_all = [128, 128, 128, 128, 128, 128, 128, 128, 128]
+            learning_rate = "0.0001";  patch_size = "64-1024"   # height first, width later
+        elif train_task == 'seg':
+            lambda_value_all = [0.0007,	0.0008, 0.0015, 0.002, 0.0025, 0.003, 0.004, 0.005, 0.006, 0.007, 0.01, 0.015]
+            epochs_all = [200, 200, 200, 600, 600, 900, 600, 600, 1000, 1000, 1200, 1000]
+            batch_size_all = [128, 128,	128, 128, 128, 128, 128, 128, 128, 128, 128, 128]
+            patch_size = "256-256"; learning_rate = "0.0001"
+        elif train_task == 'tti':
+            lambda_value_all = [0.001, 0.002, 0.004, 0.006, 0.008, 0.01, 0.015, 0.02, 0.05]
+            epochs_all = [600, 600, 600, 600, 600, 600, 600, 600, 600]
+            batch_size_all = [32, 32, 32, 32, 32, 32, 32, 32, 32]
+            patch_size = "512-512"; learning_rate = '0.0001'
+        elif train_task == 'hybrid':
+            lambda_value_all = [0.0005,	0.0008,	0.001, 0.0013, 0.0015, 0.0018, 0.0019, 0.002, 0.0021, 0.0023, 0.0025, 0.0028, 0.003, 0.004, 0.005, 0.006, 0.007, 0.01, 0.02]
+            epochs_all = [600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600]
+            batch_size_all = [360, 180, 360, 180, 180, 180, 180, 180, 180, 180, 180, 180, 180, 180, 360, 180, 180, 360, 180]
+            patch_size = "256-256"; learning_rate = '0.0001'
+    elif arch == 'elic':
+        if train_task == 'hybrid':
+            lambda_value_all = [0.0001,	0.0003,	0.0005,	0.0008,	0.001, 0.0015, 0.0019, 0.0021, 0.0025, 0.003, 0.004, 0.005, 0.007, 0.008, 0.01, 0.015, 0.02]
+            epochs_all = [600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600]
+            batch_size_all = [120, 60, 120, 60, 60, 60, 60, 60, 60, 60, 60, 120, 60, 60, 60, 60, 60]
+            patch_size = "256-256"; learning_rate = '0.0001'
+    
+    for idx, lambda_value in enumerate(lambda_value_all):
+        epochs = epochs_all[idx]
+        batch_size = batch_size_all[idx]
+
+        print(source_captions_name)
+        print(arch, train_task, transform_type, samples, bit_depth, lambda_value, epochs, learning_rate, batch_size, patch_size)
+        
+        rec_feature_path = f"{root_path}/{arch}/trained_{train_task}/{transform_type}{samples}_bitdepth{bit_depth}/sd3_tti/" \
+                           f"lambda{lambda_value}_epochs{epochs}_lr{learning_rate}_bs{batch_size}_patch{patch_size.replace(' ', '-')}"
         rec_image_path = f"{rec_feature_path}_image"
 
         # Generate images 
@@ -286,12 +309,10 @@ def compressai_evaluation(arch, trun_low, trun_high, quant_type, samples, bit_de
 def argument_parsing():
     parser = argparse.ArgumentParser(description="Train Evaluation Pipeline")
     parser.add_argument('--arch', type=str, default='bmshj2018-hyperprior', help='arch')
-    parser.add_argument('--trun_low', type=float, default=-506.97, help='trun_low')
-    parser.add_argument('--trun_high', type=float, default=105.95, help='trun_high')
-    parser.add_argument('--quant_type', type=str, default='kmeans', help='quant_type')
+    parser.add_argument('--train_task', type=str, default='seg', help='train_task')
+    parser.add_argument('--transform_type', type=str, default='kmeans', help='transform_type')
     parser.add_argument('--samples', type=int, default=10, help='samples')
     parser.add_argument('--bit_depth', type=int, default=8, help='bit_depth')
-    parser.add_argument('--train_task', type=str, default='seg', help='train_task')
     parser.add_argument('--lambda_value_all', nargs='+', type=float, help='lambda_value_all')
     parser.add_argument('--epochs', type=int, default=200, help='epochs')
     parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning_rate')
@@ -305,9 +326,7 @@ def argument_parsing():
 if __name__ == "__main__":
     args = argument_parsing()
     arch = args.arch
-    trun_low = args.trun_low
-    trun_high = args.trun_high
-    quant_type = args.quant_type
+    transform_type = args.transform_type
     samples = args.samples
     bit_depth = args.bit_depth
     train_task = args.train_task
@@ -317,18 +336,8 @@ if __name__ == "__main__":
     batch_size = args.batch_size
     patch_size = args.patch_size
 
-    compressai_evaluation(arch, trun_low, trun_high, quant_type, samples, bit_depth, train_task, lambda_value_all, epochs, learning_rate, batch_size, patch_size)
-
-
-    # # for quantization evaluation
-    # trun_high = 4.46; trun_low = -5.79 
-    # source_file = 'captions_val2017_select100.txt'
-    # quant_type = 'kmeans'; samples = 10
-    # quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file)
-    # # quant_type = 'uniform'; samples = 0
-    # # quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file)
-    # source_file = 'captions_val2017_select500.txt'
-    # quant_type = 'kmeans'; samples = 10
-    # quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file)
-    # # quant_type = 'uniform'; samples = 0
-    # # quantization_evaluation(trun_low, trun_high, quant_type, samples, source_file)
+    compressai_evaluation(arch, train_task, transform_type, samples, bit_depth, lambda_value_all, epochs, learning_rate, batch_size, patch_size)
+        
+    # for quantization evaluation
+    transform_type = 'kmeans'; samples = 10; bit_depth = 8
+    transform_evaluation(transform_type, samples, bit_depth)

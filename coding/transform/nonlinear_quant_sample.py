@@ -58,6 +58,13 @@ def kmeans_fitting(data, bit_depth=10):
     """
     num_levels = 2 ** bit_depth  # Number of quantization levels
     data_flat = data.flatten().reshape(-1,1)  # Flatten and reshape data to a column vector
+    
+    # lzj
+    #找出所有不在那个区间的index
+    #找出在那个区间的index  下采样到20%  只取1/5
+    #将这些index 拼在一起
+    #需要区别两个任务
+
     kmeans = KMeans(n_clusters=num_levels, random_state=42)
     # kmeans = MiniBatchKMeans(n_clusters=num_levels, random_state=42, batch_size=4096) # accelerate
     kmeans.fit(data_flat)
@@ -312,6 +319,8 @@ def nonlinear_fitting(org_feat_path, quant_mapping_path, model_type, task, sampl
     for feat_name in feat_names:
         org_feat_name = os.path.join(org_feat_path, feat_name)
         org_feat = np.load(org_feat_name)
+        print(f"Original feature shape: {org_feat.shape}")
+        org_feat = np.expand_dims(org_feat, axis=0)
         N, C, H, W = org_feat.shape
         print(f"{feat_name}: {N}, {C}, {H}, {W}")
 
@@ -323,8 +332,15 @@ def nonlinear_fitting(org_feat_path, quant_mapping_path, model_type, task, sampl
         if task == 'csr':
             rand_idx = np.random.choice(trun_feat.shape[2], 64, replace=False)
             trun_feat = trun_feat[:, :, rand_idx, :]  # Crop features for 'csr' task
-        feat_list_all.append(trun_feat)
+        
+        # # lzj
+        # if task == 'seg':
+        #     if N in (1, 3):  # 检查batch数是否为1或3
+        #         print(f"Skipping {feat_name} because it has {C} channels.")
+        #         continue  # 跳过当前循环迭代，不处理该文件
 
+        print(f"Post: {feat_name}: {N}, {C}, {H}, {W}")        
+        feat_list_all.append(trun_feat)        
     feat_list_all = np.asarray(feat_list_all)
     # print(f"Loaded features shape: {feat_list_all.shape}")
 
@@ -374,6 +390,8 @@ def nonlinear_fitting_get_feat(org_feat_path, quant_mapping_path, model_type, ta
         if task == 'csr':
             rand_idx = np.random.choice(trun_feat.shape[2], 64, replace=False)
             trun_feat = trun_feat[:, :, rand_idx, :]  # Crop features for 'csr' task
+        # delete [-10 10]   95%
+
         feat_list_all.append(trun_feat)
 
     feat_list_all = np.asarray(feat_list_all)
@@ -435,7 +453,8 @@ def process_fitting(feat_list, quant_mapping_path, task, bit_depth, trun_low, tr
     # Save quantization mapping
     suffix = f"_ch{ch}" if ch is not None else ""
     # save_quantization_points(density_points, f'{quant_mapping_path}/quantization_mapping_{task}{suffix}_trunl{trun_low}_trunh{trun_high}_density{samples}_bitdepth{bit_depth}.json')
-    save_quantization_points(kmeans_points, f'{quant_mapping_path}/quantization_mapping_{task}{suffix}_trunl{trun_low}_trunh{trun_high}_kmeans{samples}_bitdepth{bit_depth}.json')
+    # lzj
+    save_quantization_points(kmeans_points, f'{quant_mapping_path}/quantization_mapping_{task}{suffix}_trunl{trun_low}_trunh{trun_high}_kmeans{samples}_bitdepth{bit_depth}_{samples}full.json')
     
 def packing(feat, model_type):
     N, C, H, W = feat.shape
@@ -479,22 +498,27 @@ def random_crop(feat, crop_shape): # (hight, width)
 
 
 if __name__ == "__main__":
-    # model_type = 'dinov2'; task = 'seg'
-    # max_v = 105.95; min_v = -506.97; trun_high = 0; trun_low = 0
+    model_type = 'dinov2'; task = 'seg'
+    max_v = 105.95; min_v = -506.97; trun_high = 5; trun_low = -5
     
-    model_type = 'sd3'; task = 'tti'
-    max_v = 4.46; min_v = -5.79; trun_high = 4.46; trun_low = -5.79
+    # model_type = 'sd3'; task = 'tti'
+    # max_v = 4.46; min_v = -5.79; trun_high = 4.46; trun_low = -5.79
+    # lzj
+    # model_type ='llama3';task='csr'
+    # max_v = 47.75; min_v = -71.50; trun_high = 5; trun_low = -5
+    #lzj
+    samples = 50; quant_type = 'kmeans'; 
 
-    samples = 10; quant_type = 'kmeans'; bit_depth = 8
-
-    org_feat_path = f'/gdata1/gaocs/FCM_LM_Train_Data/{model_type}/{task}/org_feat'
+    # org_feat_path = f'/gdata1/gaocs/FCM_LM_Train_Data/{model_type}/{task}/org_feat/train'
+    org_feat_path = '/gdata2/mayf/ILSVRC2012/test_C5'
     quant_mapping_path = f'/gdata1/gaocs/Data_FCM_NQ/{model_type}/{task}/quantization_mapping'
     
-    bit_depths = [8, 10, 6]
+    #lzj
+    bit_depths = [8]
 
     for bit_depth in bit_depths:       
-        trun_flag = False
-        if trun_flag == False: trun_high = 0; trun_low = 0
+        trun_flag = True
+        if trun_flag == False: trun_high = max_v; trun_low = min_v
         print(model_type, task, trun_flag, quant_type, samples, max_v, min_v, trun_high, trun_low, bit_depth)
         # generate quantization points
         nonlinear_fitting(org_feat_path, quant_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, quant_type, bit_depth)

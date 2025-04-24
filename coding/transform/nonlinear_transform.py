@@ -30,7 +30,7 @@ def uniform_quantization(feat, min_v, max_v, bit_depth):
         scale = ((2**bit_depth) -1) / (max_v - min_v)
         quant_feat = ((feat-min_v) * scale)
 
-    quant_feat = quant_feat.astype(np.uint16) if bit_depth>8 else quant_feat.astype(np.uint8)
+    # quant_feat = quant_feat.astype(np.uint16) if bit_depth>8 else quant_feat.astype(np.uint8) # only use it to save yuv
     return quant_feat
 
 def uniform_dequantization(feat, min_v, max_v, bit_depth):
@@ -45,7 +45,7 @@ def uniform_dequantization(feat, min_v, max_v, bit_depth):
         dequant_feat = feat / scale + min_v
     return dequant_feat
 
-def kmeans_quantization(data, bit_depth=10):
+def kmeans_fitting(data, bit_depth=10):
     """
     Non-uniform quantization: maps floating-point data to integers with the specified bit depth.
     
@@ -54,11 +54,9 @@ def kmeans_quantization(data, bit_depth=10):
         bit_depth (int): Number of bits for quantization (default is 10).
         
     Returns:
-        quantized_data (numpy.ndarray): Quantized integer array.
         quantization_points (numpy.ndarray): Quantization points.
     """
     num_levels = 2 ** bit_depth  # Number of quantization levels
-    original_shape = data.shape  # Save the original shape of the data
     data_flat = data.flatten().reshape(-1,1)  # Flatten and reshape data to a column vector
     kmeans = KMeans(n_clusters=num_levels, random_state=42)
     # kmeans = MiniBatchKMeans(n_clusters=num_levels, random_state=42, batch_size=4096) # accelerate
@@ -67,19 +65,10 @@ def kmeans_quantization(data, bit_depth=10):
     # Get quantization points (cluster centers)
     quantization_points = kmeans.cluster_centers_.flatten()
     quantization_points.sort()
-    
-    # Map data to the nearest quantization points
-    quantized_data_flat = np.digitize(data_flat, quantization_points) - 1
-    # quantized_data_flat = np.argmin(cdist(data_flat, quantization_points[:, None]), axis=1) # more precise
-    quantized_data_flat = np.clip(quantized_data_flat, 0, num_levels - 1)  # Prevent overflow
-    
-    # Reshape quantized data to match the original data shape
-    quantized_data = quantized_data_flat.reshape(original_shape)
-    # quantized_data = quantized_data.astype(np.uint16) if bit_depth>8 else quantized_data.astype(np.uint8) # only used for vtm
 
-    return quantized_data, quantization_points
+    return quantization_points
 
-def density_quantization(data, bit_depth=10):
+def density_fitting(data, bit_depth=10):
     """
     Density-based non-uniform quantization: maps floating-point data to integers with the specified bit depth.
     
@@ -88,7 +77,6 @@ def density_quantization(data, bit_depth=10):
         bit_depth (int): Number of bits for quantization (default is 10).
         
     Returns:
-        quantized_data (numpy.ndarray): Quantized integer array.
         quantization_points (numpy.ndarray): Quantization points.
     """
     # Step 1: Compute the number of quantization levels
@@ -102,18 +90,49 @@ def density_quantization(data, bit_depth=10):
     cdf = np.linspace(0, 1, len(sorted_data))  # CDF values for the sorted data
     quantization_indices = np.linspace(0, 1, num_levels)  # Target CDF levels for quantization points
     quantization_points = np.interp(quantization_indices, cdf, sorted_data)  # Map target CDF levels to data values
-
-    # Step 4: Map data to the nearest quantization points
-    quantized_indices = np.digitize(data_flat, quantization_points) - 1
-    quantized_indices = np.clip(quantized_indices, 0, num_levels - 1)  # Ensure indices are within valid range
-
-    # Step 5: Reshape quantized data back to the original shape
-    quantized_data = quantized_indices.reshape(data.shape)
-    # quantized_data = quantized_data.astype(np.uint16) if bit_depth>8 else quantized_data.astype(np.uint8) # only used for vtm
     
-    return quantized_data, quantization_points
+    return quantization_points
 
-def nonlinear_dequantization(quantized_data, quantization_points):
+def nonlinear_quantization(data, quantization_points, bit_depth):
+    """
+    Apply quantization to data using a single or multiple sets of quantization points.
+    
+    Parameters:
+        data (numpy.ndarray): Original floating-point array with shape (N, C, H, W).
+        quantization_points (Union[numpy.ndarray, List[numpy.ndarray]]): 
+            A single numpy array of quantization points or a list of numpy arrays,
+            one for each channel (C).
+    
+    Returns:
+        numpy.ndarray: Quantized integer array with the same shape as the input data.
+    """
+    if isinstance(quantization_points, np.ndarray):
+        # If quantization_points is a single array, apply it to all channels
+        num_levels = len(quantization_points)
+        data_flat = data.flatten()
+        quantized_data_flat = np.digitize(data_flat, quantization_points) - 1
+        quantized_data_flat = np.clip(quantized_data_flat, 0, num_levels - 1)
+        quantized_data = quantized_data_flat.reshape(data.shape)
+    elif isinstance(quantization_points, list):
+        if len(quantization_points) != data.shape[1]:
+            raise ValueError("Length of quantization_points list must match the number of channels (C) in data.")
+        
+        quantized_data = np.zeros_like(data, dtype=int)
+        # Apply different quantization points to each channel
+        for i, qp in enumerate(quantization_points):
+            num_levels = len(qp)
+            channel_data = data[:, i, :, :]
+            channel_data_flat = channel_data.flatten()
+            quantized_channel_flat = np.digitize(channel_data_flat, qp) - 1
+            quantized_channel_flat = np.clip(quantized_channel_flat, 0, num_levels - 1)
+            quantized_data[:, i, :, :] = quantized_channel_flat.reshape(channel_data.shape)
+    else:
+        raise ValueError("quantization_points must be a numpy array or a list of numpy arrays.")
+    
+    quantized_data = quantized_data.astype(np.float32) / (2**bit_depth) # normalize to [0,1)
+    return quantized_data
+
+def nonlinear_dequantization(quantized_data, quantization_points, bit_depth):
     """
     Dequantize quantized data back to its approximate original floating-point values.
     
@@ -126,6 +145,10 @@ def nonlinear_dequantization(quantized_data, quantization_points):
     Returns:
         numpy.ndarray: Dequantized floating-point array with the same shape as the input data.
     """
+    # scale quantized_data to [0,2**bit_depth-1]
+    quantized_data = np.clip(np.round(quantized_data * (2**bit_depth)), 0, 2**bit_depth-1)
+    quantized_data = quantized_data.astype(np.uint16) if bit_depth>8 else quantized_data.astype(np.uint8)
+    
     if isinstance(quantization_points, np.ndarray):
         # If quantization_points is a single array, apply it to all channels
         quantization_points = np.sort(quantization_points)  # Ensure points are sorted
@@ -156,7 +179,7 @@ def save_quantization_points(quantization_points, file_path):
     """
     with open(file_path, 'w') as f:
         json.dump(quantization_points.tolist(), f)
-    # print(f"Quantization points saved to {file_path}")
+    print(f"Quantization points saved to {file_path}")
 
 def load_quantization_points(file_path: Union[str, list[str]]):
     """
@@ -174,7 +197,7 @@ def load_quantization_points(file_path: Union[str, list[str]]):
     def load_file(path):
         with open(path, 'r') as f:
             quantization_points = np.array(json.load(f))
-        print(f"Quantization points loaded from {path}")
+        # print(f"Quantization points loaded from {path}")
         return quantization_points
 
     if isinstance(file_path, list):
@@ -228,61 +251,23 @@ def plot_quantized_data_hist(quantized_data, log_flag, bit_depth, pdf_name):
     plt.tight_layout()
     plt.savefig(pdf_name, dpi=600, format='pdf', bbox_inches='tight')
 
-def plot_quantization_mapping(data, uniform_points, density_points, kmeans_points, pdf_name):
-    """
-    Plot the mapping of original data values to quantized integer values for uniform and non-uniform quantization.
-
-    Parameters:
-        data (numpy.ndarray): Original data array.
-        uniform_points (numpy.ndarray): Uniform quantization points.
-        non_uniform_points (numpy.ndarray): Non-uniform quantization points.
-    """
-    fontsize=26
-    font = {'family': 'Times New Roman', 'size': fontsize}
-    plt.rc('font', **font)
-
-    fig, ax1 = plt.subplots(figsize=(9, 6))
-    # Compute mappings
-    uniform_mapping = np.digitize(data, uniform_points) - 1
-    uniform_mapping = np.clip(uniform_mapping, 0, len(uniform_points) - 1)
-
-    density_mapping = np.digitize(data, density_points) - 1
-    density_mapping = np.clip(density_mapping, 0, len(density_points) - 1)
-
-    kmeans_mapping = np.digitize(data, kmeans_points) - 1
-    kmeans_mapping = np.clip(kmeans_mapping, 0, len(kmeans_points) - 1)
-
-    # Plot the mappings
-    plt.scatter(data, uniform_mapping, s=5, alpha=0.3, color='red', label='Uniform')
-    plt.scatter(data, density_mapping, s=5, alpha=0.3, color='blue', label='Density')
-    plt.scatter(data, kmeans_mapping, s=5, alpha=0.3, color='green', label='KMeans')
-
-    # Customize plot
-    # plt.title('Quantization Mapping: Original to Quantized Values')
-    plt.xlabel('Original Feature Value')
-    plt.ylabel('Quantized Feature Value')
-    # plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(pdf_name, dpi=600, format='pdf')
-
-def nonlinear_quantization(org_feat_path, quant_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, quant_type, bit_depth):
+def nonlinear_fitting(org_feat_path, transform_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, transform_type, bit_depth):
     """
     Combined function to handle quantization for different tasks based on task type.
     
     Parameters:
         org_feat_path (str): Path to the original features.
-        quant_mapping_path (str): Path to save quantization mappings.
+        transform_mapping_path (str): Path to save quantization mappings.
         model_type (str): Model type.
         task (str): Task name ('dpt', 'csr', etc.).
         samples (int): Number of samples to process.
         trun_flag (bool): Whether to apply truncation.
         trun_high (float or List[float]): High truncation limit.
         trun_low (float or List[float]): Low truncation limit.
-        quant_type (str): Quantization type.
+        transform_type (str): Quantization type.
         bit_depth (int): Bit depth for quantization.
     """
-    feat_names = os.listdir(org_feat_path)[:samples]
+    feat_names = sorted(os.listdir(org_feat_path))[:samples]
     feat_list_all = []
 
     # Load and preprocess features
@@ -290,7 +275,7 @@ def nonlinear_quantization(org_feat_path, quant_mapping_path, model_type, task, 
         org_feat_name = os.path.join(org_feat_path, feat_name)
         org_feat = np.load(org_feat_name)
         N, C, H, W = org_feat.shape
-        # print(f"{feat_name}: {N}, {C}, {H}, {W}")
+        print(f"{feat_name}: {N}, {C}, {H}, {W}")
 
         if trun_flag:
             trun_feat = truncation(org_feat, trun_low, trun_high)
@@ -298,7 +283,8 @@ def nonlinear_quantization(org_feat_path, quant_mapping_path, model_type, task, 
             trun_feat = org_feat
 
         if task == 'csr':
-            trun_feat = trun_feat[:, :, :64, :]  # Crop features for 'csr' task
+            rand_idx = np.random.choice(trun_feat.shape[2], 64, replace=False)
+            trun_feat = trun_feat[:, :, rand_idx, :]  # Crop features for 'csr' task
         feat_list_all.append(trun_feat)
 
     feat_list_all = np.asarray(feat_list_all)
@@ -309,19 +295,20 @@ def nonlinear_quantization(org_feat_path, quant_mapping_path, model_type, task, 
         # Process each channel separately for 'dpt' task
         for ch in range(feat_list_all.shape[2]):
             feat_list = feat_list_all[:, :, ch, :, :]
-            process_quantization(feat_list, quant_mapping_path, task, bit_depth, trun_low[ch], trun_high[ch], samples, ch)
+            process_fitting(feat_list, transform_mapping_path, task, trun_low[ch], trun_high[ch], transform_type, samples, bit_depth, ch)
     else:
         # Process all features together for other tasks
         feat_list = feat_list_all
-        process_quantization(feat_list, quant_mapping_path, task, bit_depth, trun_low, trun_high, samples, None)
+        process_fitting(feat_list, transform_mapping_path, task, trun_low, trun_high, transform_type, samples, bit_depth, None)
 
-def process_quantization(feat_list, quant_mapping_path, task, bit_depth, trun_low, trun_high, samples, ch=None):
+
+def process_fitting(feat_list, transform_mapping_path, task, trun_low, trun_high, transform_type, samples, bit_depth, ch=None):
     """
     Helper function to process quantization for a given feature list.
     
     Parameters:
         feat_list (numpy.ndarray): Feature list to process.
-        quant_mapping_path (str): Path to save quantization mappings.
+        transform_mapping_path (str): Path to save quantization mappings.
         task (str): Task name.
         bit_depth (int): Bit depth for quantization.
         trun_low (float): Low truncation limit.
@@ -329,71 +316,91 @@ def process_quantization(feat_list, quant_mapping_path, task, bit_depth, trun_lo
         samples (int): Number of samples.
         ch (int or None): Channel index for naming, if applicable.
     """
-    # Compute uniform quantization mapping
-    quant_time = time.time()
-    uniform_quant_feat = uniform_quantization(feat_list, trun_low, trun_high, bit_depth)
-    print(f'Uniform_quant_time: {(time.time()-quant_time):.4f}', end=' ')
-    uniform_dequant_feat = uniform_dequantization(uniform_quant_feat, trun_low, trun_high, bit_depth)
-    uniform_mse = np.mean((feat_list-uniform_dequant_feat)**2)
-    print(f"Uniform Feature MSE: {uniform_mse:.8f}")
-
-    # Compute density quantization mapping
-    quant_time = time.time()
-    density_quant_feat, density_points = density_quantization(feat_list, bit_depth)
-    print(f'Density_quant_time: {(time.time()-quant_time):.4f}', end=' ')
-    density_dequant_feat = nonlinear_dequantization(density_quant_feat, density_points)
-    density_mse = np.mean((feat_list-density_dequant_feat)**2)
-    print(f"Density Feature MSE: {density_mse:.8f}")
-
     # Compute kmeans quantization mapping
     quant_time = time.time()
-    kmeans_quant_feat, kmeans_points = kmeans_quantization(feat_list, bit_depth)
+    kmeans_points = kmeans_fitting(feat_list, bit_depth)
     print(f'KMeans_quant_time: {(time.time()-quant_time):.4f}', end=' ')
-    kmeans_dequant_feat = nonlinear_dequantization(kmeans_quant_feat, kmeans_points)
+    kmeans_quant_feat = nonlinear_quantization(feat_list, kmeans_points, bit_depth)
+    kmeans_dequant_feat = nonlinear_dequantization(kmeans_quant_feat, kmeans_points, bit_depth)
     kmeans_mse = np.mean((feat_list-kmeans_dequant_feat)**2)
     print(f"KMeans Feature MSE: {kmeans_mse:.8f}")
 
     # Save quantization mapping
     suffix = f"_ch{ch}" if ch is not None else ""
-    # save_quantization_points(density_points, f'{quant_mapping_path}/quantization_mapping_{task}{suffix}_trunl{trun_low}_trunh{trun_high}_density{samples}_bitdepth{bit_depth}.json')
-    # save_quantization_points(kmeans_points, f'{quant_mapping_path}/quantization_mapping_{task}{suffix}_trunl{trun_low}_trunh{trun_high}_kmeans{samples}_bitdepth{bit_depth}.json')
+    transform_mapping_name = f'{transform_mapping_path}/transform_mapping_{task}{suffix}_{transform_type}{samples}_bitdepth{bit_depth}.json'
+    save_quantization_points(kmeans_points, transform_mapping_name)
     
+def packing(feat, model_type):
+    N, C, H, W = feat.shape
+    if model_type == 'llama3':
+        feat = feat[0,0,:,:]
+    elif model_type == 'dinov2':
+        feat = feat.transpose(0,2,1,3).reshape(N*H,C*W)
+    elif model_type == 'sd3':
+        feat = feat.reshape(int(C/4), int(C/4), H, W).transpose(0, 2, 1, 3).reshape(int(C/4*H), int(C/4*W)) 
+    elif model_type == 'cnn':
+        feat = feat.reshape(int(C/32), int(C/64), H, W).transpose(0, 2, 1, 3).reshape(int(C/32*H), int(C/64*W)) 
+    return feat
 
+def unpacking(feat, shape, model_type):
+    N, C, H, W = shape
+    if model_type == 'llama3':
+        feat = np.expand_dims(feat, axis=0); feat = np.expand_dims(feat, axis=0)
+    elif model_type == 'dinov2':
+        feat = feat.reshape(N,H,C,W).transpose(0, 2, 1, 3) 
+    elif model_type == 'sd3':
+        feat = feat.reshape(int(C/4), H, int(C/4), W).transpose(0,2,1,3).reshape(N,C,H,W)
+    elif model_type == 'cnn':
+        feat = feat.reshape(int(C/32), H, int(C/64), W).transpose(0,2,1,3).reshape(N,C,H,W)
+    return feat
+
+def random_crop(feat, crop_shape): # (hight, width)
+    """
+    feat: input packed feature, in the shape of (H,W)
+    """
+    max_row = feat.shape[0] - crop_shape[0]
+    max_col = feat.shape[1] - crop_shape[1]
+    
+    if max_row < 0 or max_col < 0:
+        print(feat.shape[0], crop_shape[0])
+        print(feat.shape[1], crop_shape[1])
+        raise ValueError("crop_shape exceeds the feature shape")
+
+    start_row = np.random.randint(0, max_row + 1)
+    start_col = np.random.randint(0, max_col + 1)
+    
+    end_row = start_row + crop_shape[0]
+    end_col = start_col + crop_shape[1]
+    
+    return feat[start_row:end_row, start_col:end_col]
+
+def get_feature_names(source_file):
+    with open(source_file, "r", encoding="utf-8") as file:
+        return [line.strip().split()[0].split('.')[0]+'.npy' for line in file if line.strip()]
+    
 if __name__ == "__main__":
+    # model_type = 'dinov2'; task = 'seg'
+    # max_v = 105.95; min_v = -506.97; trun_high = 105.95; trun_low = -506.97
+    # source_name = 'seg_val_100.txt' 
+    
+    model_type = 'sd3'; task = 'tti'
+    max_v = 4.46; min_v = -5.79; trun_high = 4.46; trun_low = -5.79
+    source_name = 'captions_val2017_select500.txt' 
+
     # model_type = 'llama3'; task = 'csr'
-    # max_v = 47.75; min_v = -78; trun_high = 5; trun_low = -5
+    # max_v = 47.75; min_v = -71.50; trun_high = 47.75; trun_low = -71.50
+    # source_name = 'arc_challenge_test_longest500_shape.txt'
 
-    # model_type = 'dinov2'; task = 'cls'
-    # max_v = 104.1752; min_v = -552.4510; trun_high = 50; trun_low = -50
-
-    model_type = 'dinov2'; task = 'seg'
-    max_v = 103.2168; min_v = -530.9767; trun_high = 50; trun_low = -50
-
-    # model_type = 'dinov2'; task = 'dpt'
-    # max_v = [3.2777, 5.0291, 25.0456, 102.0307]; min_v = [-2.4246, -26.8908, -323.2952, -504.4310]; trun_high = [1, 2, 10, 20]; trun_low = [-1, -2, -10, -20]
+    train_data_root = f'/gdata1/gaocs/FCM_LM_Train_Data'
+    data_root = f'/gdata1/gaocs/Data_DTUFC'
+    org_feat_path = f'{train_data_root}/{model_type}/{task}/org_feat/train'
+    transform_mapping_path = f'{data_root}/transform_mapping/{model_type}_{task}'; os.makedirs(transform_mapping_path, exist_ok=True)
     
-    # model_type = 'sd3'; task = 'tti'
-    # max_v = 3.0527; min_v = -4.0938; trun_high = 3.0527; trun_low = -4.0938 
-
-    samples = 1; quant_type = 'kmeans'; bit_depth = 8
-
-    org_feat_path = f'/gdata1/gaocs/FCM_LM_Train_Data/{model_type}/{task}/org_size'
-    quant_mapping_path = f'/gdata1/gaocs/Data_FCM_NQ/{model_type}/{task}/quantization_mapping'
-    
-    # print(model_type, task, trun_flag, quant_type, samples, trun_high, trun_low)
-
-    # trun_high_all = [50, 10, 2]; trun_low_all = [-50, -10, -2]
-    bit_depths = [6]
-
-    # for idx in range(len(trun_high_all)):
-    #     trun_high = trun_high_all[idx]; trun_low = trun_low_all[idx]
-    #     for bit_depth in bit_depths:
-    #         trun_flag = True
-    #         print(model_type, task, trun_flag, quant_type, samples, max_v, min_v, trun_high, trun_low, bit_depth)
-    #         nonlinear_quantization(org_feat_path, vtm_root_path, quant_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, quant_type, bit_depth)
+    transform_type = 'kmeans'; samples = 10; bit_depths = [8]
 
     for bit_depth in bit_depths:       
         trun_flag = False
         if trun_flag == False: trun_high = max_v; trun_low = min_v
-        print(model_type, task, trun_flag, quant_type, samples, max_v, min_v, trun_high, trun_low, bit_depth)
-        nonlinear_quantization(org_feat_path, quant_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, quant_type, bit_depth)
+        print(model_type, task, trun_flag, transform_type, samples, max_v, min_v, trun_high, trun_low, bit_depth)
+        # generate transform mapping
+        nonlinear_fitting(org_feat_path, transform_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, transform_type, bit_depth)

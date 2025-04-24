@@ -42,7 +42,7 @@ from torchvision import transforms
 #gcs
 import os
 from compressai.datasets import FeatureFolder
-# from compressai.datasets import ImageFolder
+from compressai.datasets import ConcatFeatureFolder
 from compressai.losses import RateDistortionLoss
 from compressai.optimizers import net_aux_optimizer
 from compressai.zoo import image_models
@@ -175,20 +175,20 @@ def parse_args(argv):
         choices=image_models.keys(),
         help="Model architecture (default: %(default)s)",
     )
-    #gcs, model_type="sd3", task="tti", trun_flag=False, trun_low=-20, trun_high=20, quant_type="uniform", qsamples=0, bit_depth=1, quant_points
+    #gcs, model_type="sd3", train_task="tti", trun_flag=False, trun_low=-20, trun_high=20, transform_type="uniform", qsamples=0, bit_depth=1, quant_points
     parser.add_argument(
         "-model_type",
         "--model_type",
         type=str,
-        default="sd3",
+        default="hybrid",
         help="Please input the model_type.",
     )
     parser.add_argument(
-        "-task",
-        "--task",
+        "-train_task",
+        "--train_task",
         type=str,
-        default="tti",
-        help="Please input the task.",
+        default="hybrid",
+        help="Please input the train_task.",
     )
     parser.add_argument(
         "-trun_flag",
@@ -220,11 +220,11 @@ def parse_args(argv):
         help="Please input the truncated upper value.",
     )
     parser.add_argument(
-        "-quant_type",
-        "--quant_type",
+        "-transform_type",
+        "--transform_type",
         type=str,
         default="uniform",
-        help="Please input the quant_type.",
+        help="Please input the transform_type.",
     )
     parser.add_argument(
         "-qsamples",
@@ -241,11 +241,11 @@ def parse_args(argv):
         help="Please input the bit_depth.",
     )
     parser.add_argument(
-        "-quant_points_name",
-        "--quant_points_name",
+        "-transform_mapping_name",
+        "--transform_mapping_name",
         type=str,
-        default="/gdata1/gaocs/Data_FCM_NQ/dinov2/seg/quantization_mapping/quantization_mapping_seg_False_trunl-530.9767_trunh103.2168_kmeans_10_bitdepth8.json",
-        help="Please input the quant_points_name filename.",
+        default="None",
+        help="Please input the transform_mapping_name filename.",
     )
     parser.add_argument(
         "-mp",
@@ -336,10 +336,14 @@ def main(argv):
         random.seed(args.seed)
 
     #gcs 
-    train_dataset = FeatureFolder(args.dataset, split="train")
-    test_dataset = FeatureFolder(args.dataset, split="test")
+    # train_dataset = FeatureFolder(args.dataset, split="train")
+    # test_dataset = FeatureFolder(args.dataset, split="test")
+
+    all_datasets = args.dataset.split(",")
+    train_dataset = ConcatFeatureFolder(all_datasets, split="train")
+    test_dataset = ConcatFeatureFolder(all_datasets, split="test")
     
-    print(f"model_type={args.model_type}, task={args.task}, trun_flag={args.trun_flag}, trun_low={args.trun_low}, trun_high={args.trun_high}, quant_type={args.quant_type}, qsamples={args.qsamples}, bit_depth={args.bit_depth}, quant_points_name={args.quant_points_name}, patch_size={args.patch_size}, Prepro_flag={args.Prepro_flag}")
+    print(f"model_type={args.model_type}, train_task={args.train_task}, trun_flag={args.trun_flag}, trun_low={args.trun_low}, trun_high={args.trun_high}, transform_type={args.transform_type}, qsamples={args.qsamples}, bit_depth={args.bit_depth}, transform_mapping_name={args.transform_mapping_name}, patch_size={args.patch_size}, Prepro_flag={args.Prepro_flag}")
     device = "cuda" if args.cuda and torch.cuda.is_available() else "cpu"
 
     train_dataloader = DataLoader(
@@ -372,16 +376,22 @@ def main(argv):
     if args.checkpoint and args.checkpoint != 'None':  # load from previous checkpoint
         print("Loading", args.checkpoint)
         checkpoint = torch.load(args.checkpoint, map_location=device)
-        last_epoch = checkpoint["epoch"] + 1
+        last_epoch = checkpoint["epoch"] + 1; print(f'Continue pretrain on epoch {last_epoch}')
         net.load_state_dict(checkpoint["state_dict"]); print('Load state dict')
-        # optimizer.load_state_dict(checkpoint["optimizer"]); print('Load optimizer')
-        # aux_optimizer.load_state_dict(checkpoint["aux_optimizer"]); print('Load aux_optimizer')
-        # lr_scheduler.load_state_dict(checkpoint["lr_scheduler"]); print('Load lr_scheduler')
-        # # gcs, init learning rate
-        # optimizer.param_groups[0]['lr'] = args.learning_rate
+        optimizer.load_state_dict(checkpoint["optimizer"]); print('Load optimizer')
+        aux_optimizer.load_state_dict(checkpoint["aux_optimizer"]); print('Load aux_optimizer')
+        lr_scheduler.load_state_dict(checkpoint["lr_scheduler"]); print('Load lr_scheduler')
+        # gcs, init learning rate
+        # optimizer.param_groups[0]['lr'] = args.learning_rate; print('Use the re-initilized learning rate')
+
+    lr_end_threshold = 2e-4
+    lr_patience = 6
+    lr_patience_counter = 0
+    lr_below_threshold = False
 
     best_loss = float("inf")
     for epoch in range(last_epoch, args.epochs):
+        current_lr = optimizer.param_groups[0]['lr']
         print(f"Learning rate: {optimizer.param_groups[0]['lr']}")
         train_one_epoch(
             net,
@@ -401,6 +411,7 @@ def main(argv):
         #gcs
         gc.collect()  # Run Python garbage collection
         torch.cuda.empty_cache()  # Then clear cached memory on GPU
+
         
         #gcs, save checkpoint
         if args.save:
@@ -434,7 +445,34 @@ def main(argv):
                     #gcs
                     checkpoint_name,
                 )
-
+            #gcs, judge and count epochs
+            if current_lr <= lr_end_threshold:
+                if not lr_below_threshold:
+                    print(f"LR dropped below {lr_end_threshold}, will train {lr_patience} more epochs.")
+                    lr_below_threshold = True
+                    lr_patience_counter = 0
+                else:
+                    lr_patience_counter += 1
+                    print(f"LR below threshold for {lr_patience_counter}/{lr_patience} epochs.")
+                    if lr_patience_counter >= lr_patience:
+                        # save checkpoint
+                        print(f"Save the last epoch {epoch} checkpoint")
+                        checkpoint_name = f"{args.savepath[:-8]}_epoch{epoch}.pth.tar"
+                        save_checkpoint(
+                            {
+                                "epoch": epoch,
+                                "state_dict": net.state_dict(),
+                                "loss": loss,
+                                "optimizer": optimizer.state_dict(),
+                                "aux_optimizer": aux_optimizer.state_dict(),
+                                "lr_scheduler": lr_scheduler.state_dict(),
+                            },
+                            is_best,
+                            #gcs
+                            checkpoint_name,
+                        )
+                        print("Stopping training due to low learning rate.")
+                        break
 
 if __name__ == "__main__":
     main(sys.argv[1:])

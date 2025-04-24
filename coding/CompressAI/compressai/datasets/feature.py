@@ -28,37 +28,20 @@
 # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from pathlib import Path
-
-from PIL import Image
 from torch.utils.data import Dataset
-
+from torch.utils.data import ConcatDataset
 from compressai.registry import register_dataset
 
 import numpy as np 
-import json
-
 
 
 @register_dataset("FeatureFolder")
 class FeatureFolder(Dataset):
     """Load an feature folder database. Training and testing feature samples
     are respectively stored in separate directories:
-
-    .. code-block::
-
-        - rootdir/
-            - train/
-                - img000.png
-                - img001.png
-            - test/
-                - img000.png
-                - img001.png
-
     Args:
         root (string): root directory of the dataset
-        transform (callable, optional): a function or transform that takes in a
-            PIL image and returns a transformed version
-        split (string): split mode ('train' or 'val')
+        split (string): split mode ('train' or 'test')
     """
 
     def __init__(self, root, split="train"):
@@ -69,16 +52,9 @@ class FeatureFolder(Dataset):
 
         self.samples = sorted(f for f in splitdir.iterdir() if f.is_file())
         #gcs
-        # self.samples = self.samples[:128]
+        self.samples = self.samples[:32]
 
     def __getitem__(self, index):
-        """
-        Args:
-            index (int): Index
-
-        Returns:
-            feat: numpy array
-        """
         # Load feature, use float32 for training
         feat = np.load(self.samples[index]).astype(np.float32)
         feat = np.expand_dims(feat, axis=0) # (C,H,W)
@@ -87,3 +63,26 @@ class FeatureFolder(Dataset):
 
     def __len__(self):
         return len(self.samples)
+
+
+@register_dataset("ConcatFeatureFolder")
+class ConcatFeatureFolder(Dataset):
+    """
+    Combine multiple FeatureFolder datasets into one.
+    
+    Args:
+        roots (list): list of root directories, each with 'train/' and 'test/' subdirs
+        split (str): 'train' or 'test'
+    """
+
+    def __init__(self, roots, split="train"):
+        if isinstance(roots, str):
+            roots = [roots]
+        self.datasets = [FeatureFolder(root, split=split) for root in roots]
+        self.concat_dataset = ConcatDataset(self.datasets)
+
+    def __getitem__(self, index):
+        return self.concat_dataset[index]
+
+    def __len__(self):
+        return len(self.concat_dataset)

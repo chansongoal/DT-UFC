@@ -60,9 +60,9 @@ import os
 # from compressai.datasets import FeatureFolder
 import copy
 #gcs, import preprocessing
-preprocessing_path = '/ghome/gaocs/FCM-NQ/coding/NQ'
+preprocessing_path = '/ghome/gaocs/FCM-NQ/coding/transform'
 sys.path.append(preprocessing_path)
-import nonlinear_quant
+import nonlinear_transform
 
 torch.backends.cudnn.deterministic = True
 torch.set_num_threads(1)
@@ -116,6 +116,15 @@ def inference(model, x, vbr_stage=None, vbr_scale=None):
         else model.compress(x_padded, stage=vbr_stage, s=0, inputscale=vbr_scale)
     )
     enc_time = time.time() - start
+
+    #lzj, save latent
+    # latent_space = out_enc["latent"]  
+    # # print("Shape of latent_space:", latent_space.shape)
+    # x_latent = latent_space[0]
+    # save_dir = "/gdata1/gaocs/Data_FCM_NQ/sd3/tti/hyperprior/encoding_log/trunl-5.79_trunh4.46_kmeans10_bitdepth8/"
+    # x_latent_cpu = x_latent.cpu().numpy()
+    # save_path = os.path.join(save_dir, "x_latent_cpu.npy")
+    # np.save(save_path, x_latent_cpu)
 
     start = time.time()
     out_dec = (
@@ -233,27 +242,31 @@ def eval_model(
     is_vbr_model = args["architecture"].endswith("-vbr")
     #gcs
     model_type = args['model_type']; task = args["task"]; trun_flag = args["trun_flag"]; trun_low = args["trun_low"]; trun_high = args['trun_high']
-    quant_type = args['quant_type']; qsamples = args['qsamples']; bit_depth = args['bit_depth']; quant_points_name = args['quant_points_name']
-    print(model_type, task, trun_flag, trun_low, trun_high, quant_type, qsamples, bit_depth, quant_points_name)
-    #gcs,
-    # print(filepaths)
+    transform_type = args['transform_type']; qsamples = args['qsamples']; bit_depth = args['bit_depth']; transform_mapping_name = args['transform_mapping_name']
+    print(model_type, task, trun_flag, trun_low, trun_high, transform_type, qsamples, bit_depth)
+    print(f"Using fixed transform mapping: {transform_mapping_name}")
+
     source_file = args['source_file']
     filepaths = get_feature_names(args['dataset'], source_file)
     print(f"{len(filepaths)} features in {args['dataset']} are tested.")
     for filepath in filepaths:
         #gcs, load feature in the same way of training
         feat = np.load(filepath)
+        #gcs, for cnn features
+        if model_type == 'cnn': feat = np.expand_dims(feat, axis=0)
         org_feat = copy.deepcopy(feat)
         N, C, H, W = feat.shape
         #gcs, preprocessing
         if not args["half"]: feat = feat.astype(np.float32)
-        if trun_flag == 'True': feat = nonlinear_quant.truncation(feat, trun_low, trun_high)
-        if quant_type == 'uniform':
-            feat = nonlinear_quant.uniform_quantization(feat, trun_low, trun_high, bit_depth)
-        elif quant_type == 'kmeans':
-            quantization_points = nonlinear_quant.load_quantization_points(quant_points_name)
-            feat = nonlinear_quant.nonlinear_quantization(feat, quantization_points, bit_depth)
-        feat = nonlinear_quant.packing(feat, model_type)
+        if trun_flag == 'True': feat = nonlinear_transform.truncation(feat, trun_low, trun_high)
+        # #gcs, for truncation
+        # feat = nonlinear_transform.uniform_quantization(feat, trun_low, trun_high, 1)
+        if transform_type == 'uniform':
+            feat = nonlinear_transform.uniform_quantization(feat, trun_low, trun_high, bit_depth)
+        elif transform_type == 'kmeans':
+            quantization_points = nonlinear_transform.load_quantization_points(transform_mapping_name)
+            feat = nonlinear_transform.nonlinear_quantization(feat, quantization_points, bit_depth)
+        feat = nonlinear_transform.packing(feat, model_type)
         x = torch.from_numpy(feat).to(device)
         x = x.unsqueeze(0); x = x.unsqueeze(0) # reshape to [1,1,H,W]
 
@@ -270,11 +283,13 @@ def eval_model(
             #gcs, postprocessing
             rec_feat = rec_feat.squeeze(0); rec_feat = rec_feat.squeeze(0)
             rec_feat = rec_feat.cpu().detach().numpy()
-            rec_feat = nonlinear_quant.unpacking(rec_feat, [N, C, H, W], model_type)
-            if quant_type == 'uniform':
-                rec_feat = nonlinear_quant.uniform_dequantization(rec_feat, trun_low, trun_high, bit_depth)
-            elif quant_type == 'kmeans':
-                rec_feat = nonlinear_quant.nonlinear_dequantization(rec_feat, quantization_points, bit_depth)
+            rec_feat = nonlinear_transform.unpacking(rec_feat, [N, C, H, W], model_type)
+            # #gcs, for truncation
+            # rec_feat = nonlinear_transform.uniform_dequantization(rec_feat, trun_low, trun_high, 1)
+            if transform_type == 'uniform':
+                rec_feat = nonlinear_transform.uniform_dequantization(rec_feat, trun_low, trun_high, bit_depth)
+            elif transform_type == 'kmeans':
+                rec_feat = nonlinear_transform.nonlinear_dequantization(rec_feat, quantization_points, bit_depth)
             # Feature dtype
             dtype = np.float16 if model_type=='sd3' else np.float32
             rec_feat = rec_feat.astype(dtype)
@@ -374,7 +389,7 @@ def setup_args():
         default="",
         help="path of output directory. Optional, required for output json file, results per image. Default will just print the output results.",
     )
-    #gcs, add model_type, trun_flag, trun_low, trun_high, quant_type, qsamples, bit_depth
+    #gcs, add model_type, trun_flag, trun_low, trun_high, transform_type, qsamples, bit_depth
     parent_parser.add_argument(
         "-model_type",
         "--model_type",
@@ -411,11 +426,11 @@ def setup_args():
         help="Please input the truncated upper value (float or list of floats).",
     )
     parent_parser.add_argument(
-        "-quant_type",
-        "--quant_type",
+        "-transform_type",
+        "--transform_type",
         type=str,
         default="uniform",
-        help="Please input the quant_type.",
+        help="Please input the transform_type.",
     )
     parent_parser.add_argument(
         "-qsamples",
@@ -432,11 +447,11 @@ def setup_args():
         help="Please input the bit_depth.",
     )
     parent_parser.add_argument(
-        "-quant_points_name",
-        "--quant_points_name",
+        "-transform_mapping_name",
+        "--transform_mapping_name",
         type=str,
-        default="quant_points_name.json",
-        help="Please input the quant_points_name.",
+        default="None",
+        help="Please input the transform_mapping_name.",
     )
     parent_parser.add_argument(
         "-source_file",

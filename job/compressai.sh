@@ -2,18 +2,20 @@
 export HOME=/ghome/gaocs
 cd /ghome/gaocs/FCM-NQ/coding/CompressAI
 # pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
-pip install -e . 
+# pip install -e . 
 
 python run_batch.py \
-    --task "$1" \
+    --pipeline_config "$1" \
     --arch "$2" \
-    --lambda_value "$3" \
-    --epochs "$4" \
-    --save_period "$5" \
-    --learning_rate "$6" \
-    --batch_size "$7" \
-    --patch_size "$8" \
-    --quant_type "$9" \
-    --samples "${10}" \
-    --bit_depth "${11}" \
-    --pretrained_model "${12}" 
+    --train_model_type "$3" \
+    --train_task "$4" \
+    --transform_type "$5" \
+    --samples "$6" \
+    --bit_depth "$7" \
+    --lambda_value "$8" \
+    --epochs "$9" \
+    --save_period "${10}" \
+    --learning_rate "${11}" \
+    --batch_size "${12}" \
+    --patch_size "${13}" \
+    --pretrained_model "${14}" \

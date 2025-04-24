@@ -326,6 +326,8 @@ class ScaleHyperprior(CompressionModel):
         indexes = self.gaussian_conditional.build_indexes(scales_hat)
         y_strings = self.gaussian_conditional.compress(y, indexes)
         return {"strings": [y_strings, z_strings], "shape": z.size()[-2:]}
+        # #gcs, output latent
+        # return {"strings": [y_strings, z_strings], "shape": z.size()[-2:], "latent": y}
 
     def decompress(self, strings, shape):
         assert isinstance(strings, list) and len(strings) == 2

@@ -1,6 +1,6 @@
-#PBS -N sd3_tti_3090
-#PBS -o /ghome/gaocs/FCM-NQ/err_out/sd3_tti_3090.out
-#PBS -e /ghome/gaocs/FCM-NQ/err_out/sd3_tti_3090.err
+#PBS -N tti_hybrid_hyper
+#PBS -o /ghome/gaocs/FCM-NQ/err_out/tti_hybrid_hyper.out
+#PBS -e /ghome/gaocs/FCM-NQ/err_out/tti_hybrid_hyper.err
 #PBS -l nodes=1:gpus=1:A,walltime=350:00:00
 #PBS -r y
 cd $PBS_O_WORKDIR
@@ -10,12 +10,9 @@ echo This job runs on following nodes and gpus:
 cat $PBS_NODEFILE
 cat $PBS_GPUFILE
 
-# -s "/ghome/gaocs/FCM-NQ/job/sd3_tti.sh hyperprior -5.79 4.46 kmeans 10 8 seg 0.0001 200 128 0.00055 0.001 0.003 0.004 0.005 0.007" \
-# -s "/ghome/gaocs/FCM-NQ/job/sd3_tti.sh hyperprior -5.79 4.46 kmeans 10 8 csr 0.0001 400 128 64-1024 0.0005 0.0008 0.0015 0.002 0.0025 0.003 0.004" \
-# -s "/ghome/gaocs/FCM-NQ/job/sd3_tti.sh hyperprior -5.79 4.46 kmeans 10 8 tti 0.0001 600 32 512-512 0.001 0.002 0.004 0.006 0.008 0.01 0.015 0.02 0.05" \
 
 startdocker -u " -v /gdata/gaocs:/gdata/gaocs -v /gdata/liuzj:/gdata/liuzj -v /gdata1/gaocs:/gdata1/gaocs -v /gdata2/gaocs:/gdata2/gaocs " \
                 -P /ghome/gaocs  \
-                -s "/ghome/gaocs/FCM-NQ/job/sd3_tti.sh elic -5.79 4.46 kmeans 10 8 tti 0.0001 600 12 512-512 0.0002 0.0005 0.0007 0.001 0.003 0.005 0.006 0.01 0.02" \
+                -s "/ghome/gaocs/FCM-NQ/job/sd3_tti.sh hybrid hyperprior kmeans 10 8 0.0001 600 180 256-256 0.1" \
                 bit:5000/gaocs_sd3:diffusers_pytorch_cuda_latest
 

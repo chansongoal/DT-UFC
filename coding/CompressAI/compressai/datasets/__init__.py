@@ -31,6 +31,7 @@ from . import pointcloud
 from .image import ImageFolder
 #gcs
 from .feature import FeatureFolder
+from .feature import ConcatFeatureFolder
 from .pointcloud import *
 from .pregenerated import PreGeneratedMemmapDataset
 from .rawvideo import *
@@ -42,6 +43,7 @@ __all__ = [
     "ImageFolder",
     #gcs
     "FeatureFolder",
+    "ConcatFeatureFolder",
     "PreGeneratedMemmapDataset",
     "VideoFolder",
     "Vimeo90kDataset",
