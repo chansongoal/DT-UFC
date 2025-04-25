@@ -1,12 +1,12 @@
 #!/bin/bash 
 
 export HOME=/ghome/gaocs
-cd /ghome/gaocs/FCM-NQ/machines/llama3/transformers; pip install -e .
+cd /ghome/gaocs/FCM-UFC/machines/llama3/transformers; pip install -e .
 pip install safetensors==0.5.0 huggingface-hub==0.27.0
 
 export PATH=$HOME/.local/bin:$PATH
 
-cd /ghome/gaocs/FCM-NQ/machines/llama3
+cd /ghome/gaocs/FCM-UFC/machines/llama3
 
 python llama3.py \
     --arch "$1" \

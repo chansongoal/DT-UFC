@@ -1,6 +1,6 @@
 #PBS -N hybrid_hyper
-#PBS -o /ghome/gaocs/FCM-NQ/err_out/hybrid_hyper.out
-#PBS -e /ghome/gaocs/FCM-NQ/err_out/hybrid_hyper.err
+#PBS -o /ghome/gaocs/FCM-UFC/err_out/hybrid_hyper.out
+#PBS -e /ghome/gaocs/FCM-UFC/err_out/hybrid_hyper.err
 #PBS -l nodes=1:gpus=1:A,walltime=350:00:00
 #PBS -r y
 cd $PBS_O_WORKDIR
@@ -10,13 +10,13 @@ echo This job runs on following nodes and gpus:
 cat $PBS_NODEFILE
 cat $PBS_GPUFILE
 
-# /ghome/gaocs/FCM-NQ/job/compressai.sh train_test bmshj2018-hyperprior hybrid hybrid kmeans 10 8 0.001 600 600 1e-4 360 256-256 None
+# bmshj2018-hyperprior elic2022-official 
 
 startdocker -u " -v /gdata/gaocs:/gdata/gaocs  -v /gdata1/gaocs:/gdata1/gaocs -v /gdata2/gaocs:/gdata2/gaocs --shm-size=16g " \
     -P /ghome/gaocs \
-    -s "/ghome/gaocs/FCM-NQ/job/compressai.sh \
+    -s "/ghome/gaocs/FCM-UFC/job/compressai.sh \
         test \
-        elic2022-official \
+        bmshj2018-hyperprior \
         hybrid \
         hybrid \
         kmeans \

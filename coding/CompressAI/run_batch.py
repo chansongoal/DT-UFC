@@ -231,7 +231,6 @@ def compressai_test_multiple(pipeline_config, train_data_root, test_data_root, d
             batch_size_all = [120, 60, 120, 60, 60, 60, 60, 60, 60, 60, 60, 120, 60, 60, 60, 60, 60]
             patch_size = "256-256"; learning_rate = '0.0001'
     
-
     for idx, lambda_value in enumerate(lambda_value_all):
         epochs = epochs_all[idx]
         batch_size = batch_size_all[idx]

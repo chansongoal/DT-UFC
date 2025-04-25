@@ -1,8 +1,8 @@
 #!/bin/bash 
 export HOME=/ghome/gaocs
-cd /ghome/gaocs/FCM-NQ/machines/sd3/diffusers; pip install -e .
+cd /ghome/gaocs/FCM-UFC/machines/sd3/diffusers; pip install -e .
 
-cd /ghome/gaocs/FCM-NQ/machines/sd3
+cd /ghome/gaocs/FCM-UFC/machines/sd3
 python sd3.py \
     --arch "$1" \
     --train_task "$2" \

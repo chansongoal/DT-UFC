@@ -888,7 +888,7 @@ class LlamaModel(LlamaPreTrainedModel):
                 
             #gcs, save or load features here
             if layer_idx == 32:
-                temp_id_file = "/ghome/gaocs/FCM-NQ/machines/llama3/temp_id.txt"
+                temp_id_file = "./temp_id.txt"
                 with open(temp_id_file, 'r') as file:
                     id = file.read().strip()
                     # print('layer_idx, id:', layer_idx, id)

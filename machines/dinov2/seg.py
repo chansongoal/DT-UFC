@@ -526,19 +526,16 @@ def transform_evaluation(transform_type, samples, bit_depth):
     model = build_segmentation_model(cfg, backbone_model, head_checkpoint_path)
     
     # Evaluate and print results
-    bit_depth_all = [10, 8]
+    print(source_split_name)
+    print(transform_type, samples, bit_depth) 
+    
+    rec_feature_path = f"{root_path}/dinov2_seg/{transform_type}{samples}_bitdepth{bit_depth}"
 
-    for bit_depth in bit_depth_all:
-        print(source_split_name)
-        print(transform_type, samples, bit_depth) 
-        
-        rec_feature_path = f"{root_path}/dinov2_seg/{transform_type}{samples}_bitdepth{bit_depth}"
-
-        all_iou, all_miou, mse_list = seg_evaluate(model, source_img_path, org_feature_path, rec_feature_path, image_list, backbone_model)
-        # print(f"IoU: ", end=" ")
-        # for iou in all_iou: print(f"{iou*100:.4f}", end=" ") 
-        print(f"mIoU: {all_miou*100:.4f}")
-        print(f"Feature MSE: {np.mean(mse_list):.8f}\n")
+    all_iou, all_miou, mse_list = seg_evaluate(model, source_img_path, org_feature_path, rec_feature_path, image_list, backbone_model)
+    # print(f"IoU: ", end=" ")
+    # for iou in all_iou: print(f"{iou*100:.4f}", end=" ") 
+    print(f"mIoU: {all_miou*100:.4f}")
+    print(f"Feature MSE: {np.mean(mse_list):.8f}\n")
 
 def compressai_evaluation(arch, train_task, transform_type, samples, bit_depth, lambda_value_all, epochs, learning_rate, batch_size, patch_size):
     # Set up paths

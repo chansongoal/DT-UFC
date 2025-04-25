@@ -1,5 +1,5 @@
 #!/bin/bash 
-cd /ghome/gaocs/FCM-NQ/machines/dinov2
+cd /ghome/gaocs/FCM-UFC/machines/dinov2
 
 python seg.py \
     --arch "$1" \

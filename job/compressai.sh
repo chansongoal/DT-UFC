@@ -1,6 +1,6 @@
 #!/bin/bash 
 export HOME=/ghome/gaocs
-cd /ghome/gaocs/FCM-NQ/coding/CompressAI
+cd /ghome/gaocs/FCM-UFC/coding/CompressAI
 # pip install -e . -i https://pypi.tuna.tsinghua.edu.cn/simple
 # pip install -e . 
 

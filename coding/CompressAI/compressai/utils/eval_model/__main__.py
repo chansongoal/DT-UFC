@@ -59,9 +59,9 @@ import numpy as np
 import os
 # from compressai.datasets import FeatureFolder
 import copy
-#gcs, import preprocessing
-preprocessing_path = '/ghome/gaocs/FCM-NQ/coding/transform'
-sys.path.append(preprocessing_path)
+#gcs, import transfrom
+transform_path = '/ghome/gaocs/FCM-UFC/coding/transform'
+sys.path.append(transform_path)
 import nonlinear_transform
 
 torch.backends.cudnn.deterministic = True

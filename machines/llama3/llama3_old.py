@@ -163,7 +163,7 @@ if __name__ == "__main__":
     model_path = "/gdata2/gaocs/pretrained_models/llama/Meta-Llama-3-8B-Instruct"
     org_json_path = "/gdata1/gaocs/FCM_LM_Test_Dataset/llama3/csr/source/arc_challenge_sampled_longest100.jsonl"
     result_json_path = 'result.json'
-    temp_id_file = "/ghome/gaocs/FCM-NQ/machines/llama3/temp_id.txt"
+    temp_id_file = "/ghome/gaocs/FCM-UFC/machines/llama3/temp_id.txt"
     
 
     solver = ARCChallengeSolver(model_path, org_json_path, result_json_path, temp_id_file)

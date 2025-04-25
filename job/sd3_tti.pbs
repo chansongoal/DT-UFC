@@ -1,6 +1,6 @@
 #PBS -N tti_hybrid_hyper
-#PBS -o /ghome/gaocs/FCM-NQ/err_out/tti_hybrid_hyper.out
-#PBS -e /ghome/gaocs/FCM-NQ/err_out/tti_hybrid_hyper.err
+#PBS -o /ghome/gaocs/FCM-UFC/err_out/tti_hybrid_hyper.out
+#PBS -e /ghome/gaocs/FCM-UFC/err_out/tti_hybrid_hyper.err
 #PBS -l nodes=1:gpus=1:A,walltime=350:00:00
 #PBS -r y
 cd $PBS_O_WORKDIR
@@ -13,6 +13,6 @@ cat $PBS_GPUFILE
 
 startdocker -u " -v /gdata/gaocs:/gdata/gaocs -v /gdata/liuzj:/gdata/liuzj -v /gdata1/gaocs:/gdata1/gaocs -v /gdata2/gaocs:/gdata2/gaocs " \
                 -P /ghome/gaocs  \
-                -s "/ghome/gaocs/FCM-NQ/job/sd3_tti.sh hybrid hyperprior kmeans 10 8 0.0001 600 180 256-256 0.1" \
+                -s "/ghome/gaocs/FCM-UFC/job/sd3_tti.sh hyperprior hybrid kmeans 10 8 0.0001 600 180 256-256 0.1" \
                 bit:5000/gaocs_sd3:diffusers_pytorch_cuda_latest
 
