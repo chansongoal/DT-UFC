@@ -2,6 +2,7 @@ import os
 import numpy as np
 from typing import Union, List
 import nonlinear_transform
+import time
 
 def perform_nonlinear_transform(org_feat_path, rec_feat_path, transform_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, transform_type, bit_depth, data_size, source_file=None, crop_flag=True):
     transform_mapping_name = f'{transform_mapping_path}/transform_mapping_{task}_{transform_type}{samples}_bitdepth{bit_depth}.json'
@@ -10,7 +11,7 @@ def perform_nonlinear_transform(org_feat_path, rec_feat_path, transform_mapping_
     if source_file == None: feat_names = sorted(os.listdir(org_feat_path))
     else: 
         with open(source_file, 'r') as f:
-            feat_names = [line.strip().split(' ', 1)[0][:-4]+'.npy' for line in f if line.strip()]
+            feat_names = [line.strip().split(' ', 1)[0].split('.')[0]+'.npy' for line in f if line.strip()]
             print('number samples: ', len(feat_names))
     # feat_names = [f for f in os.listdir(org_feat_path) if f.startswith("arc_")]
 
@@ -32,12 +33,13 @@ def perform_nonlinear_transform(org_feat_path, rec_feat_path, transform_mapping_
 
         # generate transformed features for test data
         # quantized_feat = quantized_feat.astype(dtype)
-        # np.save(rec_feat_name, quantized_feat)
+        np.save(rec_feat_name, quantized_feat)
     
-        # generate inverse transformed features for test data
-        dequantized_feat = nonlinear_transform.nonlinear_dequantization(quantized_feat, quantization_points, bit_depth)
-        dequantized_feat = dequantized_feat.astype(dtype)
-        np.save(rec_feat_name, dequantized_feat)
+        # # generate inverse transformed features for test data
+        # quantized_feat = np.load(rec_feat_name)
+        # dequantized_feat = nonlinear_transform.nonlinear_dequantization(quantized_feat, quantization_points, bit_depth)
+        # dequantized_feat = dequantized_feat.astype(dtype)
+        # np.save(rec_feat_name, dequantized_feat)
 
         # # generate transformed features for training data
         # pack_feat = nonlinear_transform.packing(quantized_feat, model_type)
@@ -86,8 +88,8 @@ def perform_uniform_normalization(org_feat_path, rec_feat_path, model_type, trun
 
 if __name__ == "__main__":
     # model_type = 'dinov2'; task = 'seg'; max_v = 105.95; min_v = -506.97; trun_high = 105.95; trun_low = -506.97
-    model_type = 'llama3'; task = 'csr'; max_v = 47.75; min_v = -71.50; trun_high = 47.75; trun_low = -71.50
-    # model_type = 'sd3'; task = 'tti'; max_v = 4.46; min_v = -5.79; trun_high = 4.46; trun_low = -5.79
+    # model_type = 'llama3'; task = 'csr'; max_v = 47.75; min_v = -71.50; trun_high = 47.75; trun_low = -71.50
+    model_type = 'sd3'; task = 'tti'; max_v = 4.46; min_v = -5.79; trun_high = 4.46; trun_low = -5.79
     
 
     train_data_root = f'/gdata1/gaocs/FCM_LM_Train_Data'
@@ -96,8 +98,9 @@ if __name__ == "__main__":
     transform_mapping_path = f'{data_root}/transform_mapping/{model_type}_{task}'
 
     # config = 'train'; source_file = None
-    # config = 'test'; source_file = '{test_data_root}/{model_type}/{task}/source/captions_val2017_select500.txt'
-    config = 'test'; source_file = f'{test_data_root}/{model_type}/{task}/source/arc_challenge_test_longest500_shape.txt'
+    config = 'test'; source_file = f'{test_data_root}/{model_type}/{task}/source/captions_val2017_select500.txt'
+    # config = 'test'; source_file = f'{test_data_root}/{model_type}/{task}/source/arc_challenge_test_longest500_shape.txt'
+    # config = 'test'; source_file = f'{test_data_root}/{model_type}/{task}/source/seg_val_100.txt'
     
     # quant_type = 'uniform'; samples = 0
     quant_type = 'kmeans'; samples = 10; bit_depths = [8]
@@ -124,4 +127,5 @@ if __name__ == "__main__":
         org_feat_path = f'{test_data_root}/{model_type}/{task}/feature' 
         # rec_feat_path = f'{data_root}/transformed/{model_type}_{task}/{quant_type}{samples}_bitdepth{bit_depth}'; os.makedirs(rec_feat_path, exist_ok=True)
         rec_feat_path = f'{data_root}/inverse_transformed/{model_type}_{task}/{quant_type}{samples}_bitdepth{bit_depth}'; os.makedirs(rec_feat_path, exist_ok=True)
-        perform_nonlinear_transform(org_feat_path, rec_feat_path, transform_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, quant_type, bit_depth, data_size, source_file, False)
+        # perform_nonlinear_transform(org_feat_path, rec_feat_path, transform_mapping_path, model_type, task, samples, trun_flag, trun_high, trun_low, quant_type, bit_depth, data_size, source_file, False)
+        perform_uniform_normalization(org_feat_path, rec_feat_path, model_type, trun_flag, trun_high, trun_low, bit_depth, data_size, False)

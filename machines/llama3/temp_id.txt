@@ -1,1 +1,1 @@
-/gdata1/gaocs/Data_DTUFC/decoded/hyperprior/trained_hybrid/kmeans10_bitdepth8/llama3_csr/lambda0.02_epochs600_lr0.0001_bs180_patch256-256/LEAP_2009_8_10430
+/gdata1/gaocs/FCM_LM_Test_Dataset/llama3/csr/feature/LEAP_2009_8_10430

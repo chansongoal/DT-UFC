@@ -1,8 +1,8 @@
 # Introduction
 
-This project is the official implementation of the paper titled **“[DT-UFC: Universal Large Model Feature Coding via Peaky-to-Balanced Distribution Transformation](https://arxiv.org/abs/2412.04307)”**. 
+This project is the official implementation of the paper titled **“[DT-UFC: Universal Large Model Feature Coding via Peaky-to-Balanced Distribution Transformation](https://arxiv.org/abs/2506.16495)”**. 
 
-**"Universal Feature coding"** is a key branch of the field of **"Coding for Machines"**, focusing on scenarios where a neural network is divided into multiple parts and deployed across different devices. In such cases, the intermediate features are encoded and transmitted between devices. The primary goal of feature coding is to minimize the bitrate under a certain constraint of task accuracy or maxmize the task accuracy under a certain constraint of bitrate.
+**"Universal Feature Coding"** is a key branch of the field of **"Coding for Machines"**, focusing on scenarios where a neural network is divided into multiple parts and deployed across different devices. In such cases, the intermediate features are encoded and transmitted between devices. The primary goal of feature coding is to minimize the bitrate under a certain constraint of task accuracy or maxmize the task accuracy under a certain constraint of bitrate.
 
 We divide the source codes into two folders: *coding and machines*. 
 The *“coding”* folder includes codes related to feature coding and the *“machines”* folder includes codes related to the machines algorithms (feature extraction and task evaluation).
@@ -65,7 +65,7 @@ The *“coding”* folder includes codes related to feature coding and the *“m
 
 - ### Codec Training
 
-    Config the parameters accordingly and generate the transformed training data from original extracted features using the below command. Generate training data before training saves the training time. For the original feature extraction, please refer to "[chansongoal/FCM-LM](https://github.com/chansongoal/FCM-LM)"
+    Config the parameters accordingly and generate the transformed training data from original extracted features using the below command. Generate training data before training saves the training time. For the original feature extraction, please refer to "[chansongoal/LaMoFC](https://github.com/chansongoal/LaMoFC)"
 
     `cd coding/transform; python generate_data.py`
     
