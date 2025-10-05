@@ -384,8 +384,8 @@ def main(argv):
         # gcs, init learning rate
         # optimizer.param_groups[0]['lr'] = args.learning_rate; print('Use the re-initilized learning rate')
 
-    lr_end_threshold = 2e-4
-    lr_patience = 6
+    lr_end_threshold = 2e-8
+    lr_patience = 10
     lr_patience_counter = 0
     lr_below_threshold = False
 
