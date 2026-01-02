@@ -7,16 +7,20 @@ This project is the official implementation of the paper titled **“[DT-UFC: Un
 We divide the source codes into two folders: *coding and machines*. 
 The *“coding”* folder includes codes related to feature coding and the *“machines”* folder includes codes related to the machines algorithms (feature extraction and task evaluation).
 
+<p align="center">
+  <img src="framework.png" alt="CFQA Framework" width="720">
+</p>
+
 # Key Features
 
-- ## Includes 3 large models and 1 CNN model
+- ## Support 3 large models and 1 CNN model
     - **LLaMA3:** Common Sense Reasoning task
     - **DINOv2:** Semantic Segmentation task
     - **SD3:** Text-to-Image Synthesis task
     - **ResNet50:** Image Classification task
 
 
-- ## Includes 2 Learning-based Codecs
+- ## Include 2 Learning-based Codecs
     - **Hyperprior** 
     - **ELIC**
 
@@ -97,18 +101,23 @@ The feature extraction and task evaluation process use the same codes. You are f
         `cd machines/sd3/; python sd3.py`
 
 
-
-# Pretrained Codecs
+# Related Links
+## Pretrained Codecs
 
 Download from the below links and put them in the corresponding folders. 
-
 - **Hyperprior:**
-<Hyperprior>
+<https://huggingface.co/chansongoal/DT-UFC/tree/main/hyperprior_hybrid>
 
 - **ELIC:**
-<ELIC>
+<https://huggingface.co/chansongoal/DT-UFC/tree/main/elic_hybrid>
 
-# Pretrained Machine Models
+## Pretrained Transform Mapping
+Download from the below links and put them in the corresponding folders. 
+
+- **Transform Mapping:**
+<https://huggingface.co/chansongoal/DT-UFC/tree/main/transform_mapping>
+
+## Pretrained Machine Models
 
 Download from the below links and put them in the *“Data_example/model_type/task/pretrained_head”* folder. Please make sure the folder is consistent with the codes.
 
@@ -130,3 +139,22 @@ Download from the below links and put them in the *“Data_example/model_type/ta
 - **Stable Diffusion 3:**
 <https://huggingface.co/stabilityai/stable-diffusion-3-medium-diffusers/tree/main>
 
+## 📚 Citation
+
+If you use our dataset or evaluation tools, please cite the following paper:
+
+```bibtex
+@inproceedings{gao2025dtufc,
+    author = {Gao, Changsheng and Liu, Zijie and Li, Li and Liu, Dong and Sun, Xiaoyan and Lin, Weisi},
+    title = {{DT-UFC}: Universal Large Model Feature Coding via Peaky-to-Balanced Distribution Transformation},
+    year = {2025},
+    isbn = {9798400720352},
+    publisher = {Association for Computing Machinery},
+    address = {New York, NY, USA},
+    doi = {10.1145/3746027.3755814},
+    booktitle = {Proceedings of the 33rd ACM International Conference on Multimedia},
+    pages = {5198–5207},
+    keywords = {coding for machines, feature coding, large models},
+    location = {Dublin, Ireland},
+    series = {MM '25}
+}
